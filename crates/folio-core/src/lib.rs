@@ -57,3 +57,12 @@ pub struct Item {
     #[serde(rename = "_v")]
     pub version: u8,
 }
+
+impl Item {
+    pub fn validate(&self) -> Result<(), String> {
+        if self.name.is_empty() {
+            return Err("Name cannot be empty".to_string());
+        }
+        Ok(())
+    }
+}
