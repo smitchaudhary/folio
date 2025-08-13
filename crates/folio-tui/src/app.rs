@@ -3,7 +3,7 @@ use crate::data::{
     save_inbox_items,
 };
 use crate::event::{AppEvent, EventHandler};
-use crate::forms::{AddItemForm, EditItemForm};
+use crate::forms::{FormType, ItemForm};
 use crate::state::{AppState, View};
 use crate::terminal::{restore_terminal, setup_terminal};
 use crate::widgets::ItemsTable;
@@ -16,8 +16,8 @@ pub struct App {
     pub should_quit: bool,
     pub state: AppState,
     pub table_state: TableState,
-    pub add_form: AddItemForm,
-    pub edit_form: EditItemForm,
+    pub add_form: ItemForm,
+    pub edit_form: ItemForm,
     pub show_delete_confirmation: bool,
     pub show_help: bool,
     pub status_message: Option<(String, Instant)>,
@@ -31,8 +31,8 @@ impl App {
             should_quit: false,
             state: AppState::new(),
             table_state: TableState::default(),
-            add_form: AddItemForm::new(),
-            edit_form: EditItemForm::new(),
+            add_form: ItemForm::new(FormType::Add),
+            edit_form: ItemForm::new(FormType::Edit),
             show_delete_confirmation: false,
             show_help: false,
             status_message: None,
@@ -100,13 +100,17 @@ impl App {
             }
             return;
         }
-        
+
         if self.edit_form.is_visible {
             match key_event.code {
                 KeyCode::Esc => {
                     self.edit_form.toggle_visibility();
                 }
-                KeyCode::Char('s') if key_event.modifiers.contains(crossterm::event::KeyModifiers::CONTROL) => {
+                KeyCode::Char('s')
+                    if key_event
+                        .modifiers
+                        .contains(crossterm::event::KeyModifiers::CONTROL) =>
+                {
                     if self.submit_edit_form() {
                         self.edit_form.toggle_visibility();
                     }
@@ -236,11 +240,9 @@ impl App {
             let _ = self.save_data();
         }
     }
-    
+
     fn start_edit_item(&mut self) {
-        // Check if an item is selected
         if let Some(item) = self.state.selected_item() {
-            // Populate the edit form with the item's data
             self.edit_form.populate_fields(item);
             self.edit_form.toggle_visibility();
         } else {
@@ -342,7 +344,7 @@ impl App {
 
         true
     }
-    
+
     fn submit_edit_form(&mut self) -> bool {
         let name = self
             .edit_form
@@ -374,7 +376,6 @@ impl App {
             .cloned()
             .unwrap_or_default();
 
-        // Update the selected item with the new values
         if let Some(item) = self.state.selected_item_mut() {
             item.name = name;
             item.item_type = match item_type.as_str() {
@@ -386,12 +387,11 @@ impl App {
             item.author = author;
             item.link = link;
             item.note = note;
-            
-            // Validate the updated item
+
             if item.validate().is_err() {
                 return false;
             }
-            
+
             let _ = self.save_data();
             self.show_status_message("Item updated".to_string());
             true
@@ -444,7 +444,6 @@ impl App {
                         self.handle_key_event(key_event);
                     }
                     AppEvent::Tick => {
-                        // Clear status message after 2 seconds
                         if let Some((_, time)) = self.status_message {
                             if time.elapsed() > Duration::from_secs(2) {
                                 self.status_message = None;
