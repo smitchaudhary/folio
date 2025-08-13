@@ -224,7 +224,6 @@ impl ItemForm {
             crossterm::event::KeyCode::Enter => {
                 if let Some(field) = self.fields.get(&self.focused_field) {
                     if let FieldType::Dropdown { .. } = field.field_type {
-                        // Toggle dropdown selection
                         if let Some(field) = self.fields.get_mut(&self.focused_field) {
                             if let FieldType::Dropdown { options, selected } = &mut field.field_type
                             {

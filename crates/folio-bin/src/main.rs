@@ -420,6 +420,14 @@ fn handle_mark_ref_command(id: usize) -> Result<(), Box<dyn std::error::Error>> 
     Ok(())
 }
 
+fn format_item_status(item: &folio_core::Item) -> String {
+    match item.status {
+        folio_core::Status::Todo => "todo".to_string(),
+        folio_core::Status::Doing => "doing".to_string(),
+        folio_core::Status::Done => "done".to_string(),
+    }
+}
+
 fn prompt_for_input(field_name: &str) -> Result<String, Box<dyn std::error::Error>> {
     use std::io::{Write, stdin, stdout};
 
@@ -493,21 +501,114 @@ fn handle_add_command(
         return Ok(());
     }
 
-    let (new_inbox, to_archive) = add_with_cap(
-        inbox_items,
-        new_item,
-        config.max_items as usize,
-        config.archive_on_overflow,
-    )?;
+    let strategy = config.archive_on_overflow.clone();
+    match add_with_cap(inbox_items, new_item, config.max_items as usize, strategy) {
+        Ok((new_inbox, to_archive)) => {
+            let has_archived_items = !to_archive.is_empty();
 
-    save_inbox(&new_inbox)?;
+            save_inbox(&new_inbox)?;
 
-    for item in to_archive {
-        append_to_archive(&item)?;
+            for item in &to_archive {
+                append_to_archive(item)?;
+            }
+
+            if has_archived_items {
+                println!(
+                    "Item added successfully. The following item(s) were automatically archived due to overflow:"
+                );
+                for item in to_archive {
+                    println!("  - {} ({})", item.name, format_item_status(&item));
+                }
+            } else {
+                println!("Item added successfully");
+            }
+            Ok(())
+        }
+        Err(_) => {
+            match &config.archive_on_overflow {
+                OverflowStrategy::Abort => {
+                    println!("Inbox limit ({}) reached.", config.max_items);
+                    println!();
+                    println!("Choose an action:");
+                    println!("  [D]elete an existing item (use 'folio delete <id>')");
+                    println!(
+                        "  [A]rchive an item (change status to 'done' or use 'folio archive <id>')"
+                    );
+                    println!("  [I]ncrease inbox size: `folio config set max_items N`");
+                    println!(
+                        "  [C]hange overflow strategy: `folio config set archive_on_overflow [todo|any]`"
+                    );
+                    println!();
+                    println!("Would you like to see the current inbox items? (y/N): ");
+
+                    use std::io::{Write, stdin, stdout};
+                    stdout().flush()?;
+                    let mut input = String::new();
+                    stdin().read_line(&mut input)?;
+                    let response = input.trim().to_lowercase();
+
+                    if response == "y" || response == "yes" {
+                        let inbox_items = load_items_from_file(&inbox_path)?;
+                        if !inbox_items.is_empty() {
+                            println!();
+                            println!(
+                                "{:<4} {:<6} {:<30} {:<10} {:<20} {:<15}",
+                                "ID", "Status", "Name", "Type", "Added", "Author"
+                            );
+                            println!("{}", "-".repeat(100));
+
+                            for (index, item) in inbox_items.iter().enumerate() {
+                                let status_char = match item.status {
+                                    folio_core::Status::Todo => "T",
+                                    folio_core::Status::Doing => "D",
+                                    folio_core::Status::Done => "✓",
+                                };
+
+                                let type_abbr = match item.item_type {
+                                    folio_core::ItemType::Article => "art.",
+                                    folio_core::ItemType::Video => "vid.",
+                                    folio_core::ItemType::Blog => "blog",
+                                    folio_core::ItemType::Other => "other",
+                                };
+
+                                let added_date = item.added_at.format("%Y-%m-%d").to_string();
+
+                                let name_display = if item.name.len() > 28 {
+                                    format!("{}..", &item.name[..26])
+                                } else {
+                                    item.name.clone()
+                                };
+
+                                let author_display = if item.author.len() > 13 {
+                                    format!("{}..", &item.author[..11])
+                                } else {
+                                    item.author.clone()
+                                };
+
+                                println!(
+                                    "{:<4} {:<6} {:<30} {:<10} {:<20} {:<15}",
+                                    index + 1,
+                                    status_char,
+                                    name_display,
+                                    type_abbr,
+                                    added_date,
+                                    author_display
+                                );
+                            }
+                        }
+                    }
+
+                    std::process::exit(1);
+                }
+                _ => {
+                    // This shouldn't happen since we only return Err for Abort strategy
+                    // But just in case, handle it gracefully
+                    eprintln!("Error: Inbox is full");
+                    std::process::exit(1);
+                }
+            }
+        }
     }
-
-    println!("Item added successfully");
-    Ok(())
 }
 
 fn handle_config_command(subcommand: &ConfigSubcommands) -> Result<(), Box<dyn std::error::Error>> {
@@ -545,11 +646,10 @@ fn handle_config_command(subcommand: &ConfigSubcommands) -> Result<(), Box<dyn s
                 "archive_on_overflow" => match value.as_str() {
                     "abort" => config.archive_on_overflow = OverflowStrategy::Abort,
                     "todo" => config.archive_on_overflow = OverflowStrategy::Todo,
-                    "done" => config.archive_on_overflow = OverflowStrategy::Done,
                     "any" => config.archive_on_overflow = OverflowStrategy::Any,
                     _ => {
                         eprintln!(
-                            "Invalid value for archive_on_overflow: {}. Must be one of: abort, todo, done, any",
+                            "Invalid value for archive_on_overflow: {}. Must be one of: abort, todo, any",
                             value
                         );
                         process::exit(1);

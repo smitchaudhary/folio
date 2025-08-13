@@ -9,6 +9,8 @@ use crate::terminal::{restore_terminal, setup_terminal};
 use crate::widgets::ItemsTable;
 use chrono::Utc;
 use crossterm::event::{KeyCode, KeyEvent};
+use folio_core::{Item, OverflowStrategy, add_with_cap};
+use folio_storage::load_config;
 use ratatui::widgets::TableState;
 use std::time::{Duration, Instant};
 
@@ -24,6 +26,10 @@ pub struct App {
     pub filter_input_mode: bool,
     pub filter_input: String,
     pub start_with_add_form: bool,
+    pub show_cap_warning: bool,
+    pub cap_warning_message: String,
+    pub pending_add_item: Option<Item>,
+    pub show_done_confirmation: bool,
 }
 
 impl App {
@@ -40,6 +46,10 @@ impl App {
             filter_input_mode: false,
             filter_input: String::new(),
             start_with_add_form: false,
+            show_cap_warning: false,
+            cap_warning_message: String::new(),
+            pending_add_item: None,
+            show_done_confirmation: false,
         }
     }
 
@@ -78,6 +88,13 @@ impl App {
             return;
         }
 
+        if self.show_cap_warning {
+            if let KeyCode::Esc | KeyCode::Char('q') | KeyCode::Enter = key_event.code {
+                self.show_cap_warning = false;
+            }
+            return;
+        }
+
         if self.show_delete_confirmation {
             match key_event.code {
                 KeyCode::Char('y') | KeyCode::Char('Y') => {
@@ -86,6 +103,25 @@ impl App {
                 }
                 KeyCode::Char('n') | KeyCode::Char('N') | KeyCode::Esc => {
                     self.show_delete_confirmation = false;
+                }
+                _ => {}
+            }
+            return;
+        }
+
+        if self.show_done_confirmation {
+            match key_event.code {
+                KeyCode::Char('y') | KeyCode::Char('Y') => {
+                    if let Some(done_item) = self.state.move_selected_to_done() {
+                        let _ = append_item_to_archive(&done_item);
+                        self.show_status_message("Item archived".to_string());
+                    } else {
+                        let _ = self.save_data();
+                    }
+                    self.show_done_confirmation = false;
+                }
+                KeyCode::Char('n') | KeyCode::Char('N') | KeyCode::Esc => {
+                    self.show_done_confirmation = false;
                 }
                 _ => {}
             }
@@ -172,11 +208,23 @@ impl App {
                 self.table_state.select(Some(self.state.selected_index));
             }
             KeyCode::Char('s') => {
-                if let Some(done_item) = self.state.cycle_selected_item_status() {
-                    let _ = append_item_to_archive(&done_item);
-                    self.show_status_message("Item archived".to_string());
-                } else {
-                    let _ = self.save_data();
+                if let Some(item) = self.state.selected_item() {
+                    let next_status = match item.status {
+                        folio_core::Status::Todo => folio_core::Status::Doing,
+                        folio_core::Status::Doing => folio_core::Status::Done,
+                        folio_core::Status::Done => folio_core::Status::Todo,
+                    };
+
+                    if next_status == folio_core::Status::Done {
+                        self.show_done_confirmation = true;
+                    } else {
+                        if let Some(done_item) = self.state.cycle_selected_item_status() {
+                            let _ = append_item_to_archive(&done_item);
+                            self.show_status_message("Item archived".to_string());
+                        } else {
+                            let _ = self.save_data();
+                        }
+                    }
                 }
             }
             KeyCode::Char('i') => {
@@ -185,15 +233,12 @@ impl App {
                 }
             }
             KeyCode::Char('d') => {
-                if let Some(done_item) = self.state.move_selected_to_done() {
-                    let _ = append_item_to_archive(&done_item);
-                    self.show_status_message("Item archived".to_string());
-                } else {
-                    let _ = self.save_data();
+                if self.state.selected_item().is_some() {
+                    self.show_done_confirmation = true;
                 }
             }
             KeyCode::Char('a') => {
-                self.add_form.toggle_visibility();
+                self.check_cap_before_add();
             }
             KeyCode::Char('x') => {
                 self.show_delete_confirmation = true;
@@ -232,6 +277,37 @@ impl App {
                 }
             }
             _ => {}
+        }
+    }
+
+    fn check_cap_before_add(&mut self) {
+        match load_config() {
+            Ok(config) => {
+                if self.state.inbox_items.len() >= config.max_items as usize {
+                    match config.archive_on_overflow {
+                        OverflowStrategy::Abort => {
+                            self.cap_warning_message = format!(
+                                "Inbox limit ({}) reached.\n\n\
+                                Choose an action:\n\
+                                • Delete an existing item (use 'x' key to delete)\n\
+                                • Archive an item (change status to 'done' or use 'A' key)\n\
+                                • Adjust inbox size: `folio config set max_items N`\n\
+                                • Change overflow strategy: `folio config set archive_on_overflow [todo|any]`",
+                                config.max_items
+                            );
+                            self.show_cap_warning = true;
+                        }
+                        OverflowStrategy::Todo | OverflowStrategy::Any => {
+                            self.add_form.toggle_visibility();
+                        }
+                    }
+                } else {
+                    self.add_form.toggle_visibility();
+                }
+            }
+            Err(_) => {
+                self.add_form.toggle_visibility();
+            }
         }
     }
 
@@ -345,12 +421,56 @@ impl App {
             return false;
         }
 
-        self.state.inbox_items.push(new_item);
+        match load_config() {
+            Ok(config) => {
+                match add_with_cap(
+                    self.state.inbox_items.clone(),
+                    new_item,
+                    config.max_items as usize,
+                    config.archive_on_overflow,
+                ) {
+                    Ok((new_inbox, to_archive)) => {
+                        self.state.inbox_items = new_inbox;
 
-        let _ = self.save_data();
-        self.show_status_message("Item added".to_string());
+                        let _ = self.save_data();
 
-        true
+                        for item in &to_archive {
+                            let _ = append_item_to_archive(item);
+                        }
+
+                        if !to_archive.is_empty() {
+                            self.show_status_message(format!(
+                                "Item added. {} item(s) archived due to overflow",
+                                to_archive.len()
+                            ));
+                        } else {
+                            self.show_status_message("Item added".to_string());
+                        }
+
+                        true
+                    }
+                    Err(_) => {
+                        self.cap_warning_message = format!(
+                            "Inbox limit ({}) reached.\n\n\
+                            Choose an action:\n\
+                            • Delete an existing item (use 'x' key to delete)\n\
+                            • Archive an item (change status to 'done' or use 'A' key)\n\
+                            • Adjust inbox size: `folio config set max_items N`\n\
+                            • Change overflow strategy: `folio config set archive_on_overflow [todo|any]`",
+                            config.max_items
+                        );
+                        self.show_cap_warning = true;
+                        false
+                    }
+                }
+            }
+            Err(_) => {
+                self.state.inbox_items.push(new_item);
+                let _ = self.save_data();
+                self.show_status_message("Item added".to_string());
+                true
+            }
+        }
     }
 
     fn submit_edit_form(&mut self) -> bool {
@@ -445,6 +565,14 @@ impl App {
 
                 if self.show_help {
                     Self::render_help_dialog(f);
+                }
+
+                if self.show_cap_warning {
+                    Self::render_cap_warning_dialog(f, &self.cap_warning_message);
+                }
+
+                if self.show_done_confirmation {
+                    Self::render_done_confirmation_dialog(f);
                 }
 
                 Self::render_status_bar(
@@ -544,6 +672,66 @@ impl App {
         let paragraph = ratatui::widgets::Paragraph::new(help_text)
             .block(block)
             .alignment(ratatui::layout::Alignment::Left);
+
+        frame.render_widget(paragraph, popup_area);
+    }
+
+    fn render_cap_warning_dialog(frame: &mut ratatui::Frame, message: &str) {
+        let area = frame.size();
+        let popup_area = ratatui::layout::Rect {
+            x: area.width / 2 - 35,
+            y: area.height / 2 - 8,
+            width: 70.min(area.width),
+            height: 16.min(area.height),
+        };
+
+        frame.render_widget(ratatui::widgets::Clear, popup_area);
+
+        let block = ratatui::widgets::Block::default()
+            .title("Inbox Full")
+            .borders(ratatui::widgets::Borders::ALL);
+
+        let text_lines: Vec<ratatui::text::Line> = message
+            .lines()
+            .map(|line| ratatui::text::Line::from(line.to_string()))
+            .collect();
+
+        let mut content_lines = text_lines;
+        content_lines.push(ratatui::text::Line::from(""));
+        content_lines.push(ratatui::text::Line::from("Press Enter or Esc to continue"));
+
+        let paragraph = ratatui::widgets::Paragraph::new(content_lines)
+            .block(block)
+            .alignment(ratatui::layout::Alignment::Left);
+
+        frame.render_widget(paragraph, popup_area);
+    }
+
+    fn render_done_confirmation_dialog(frame: &mut ratatui::Frame) {
+        let area = frame.size();
+        let popup_area = ratatui::layout::Rect {
+            x: area.width / 2 - 25,
+            y: area.height / 2 - 3,
+            width: 50.min(area.width),
+            height: 6.min(area.height),
+        };
+
+        frame.render_widget(ratatui::widgets::Clear, popup_area);
+
+        let block = ratatui::widgets::Block::default()
+            .title("Confirm Mark as Done")
+            .borders(ratatui::widgets::Borders::ALL);
+
+        let text = vec![
+            ratatui::text::Line::from("Mark item as Done?"),
+            ratatui::text::Line::from("(This will move it to Archive)"),
+            ratatui::text::Line::from(""),
+            ratatui::text::Line::from("(Y)es / (N)o"),
+        ];
+
+        let paragraph = ratatui::widgets::Paragraph::new(text)
+            .block(block)
+            .alignment(ratatui::layout::Alignment::Center);
 
         frame.render_widget(paragraph, popup_area);
     }

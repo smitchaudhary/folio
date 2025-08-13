@@ -1,4 +1,4 @@
-use crate::{Item, Status, CapError, OverflowStrategy};
+use crate::{CapError, Item, OverflowStrategy, Status};
 
 pub fn add_with_cap(
     mut inbox: Vec<Item>,
@@ -15,15 +15,6 @@ pub fn add_with_cap(
         OverflowStrategy::Abort => Err(CapError::Full),
         OverflowStrategy::Todo => {
             if let Some(pos) = inbox.iter().position(|i| i.status == Status::Todo) {
-                let removed = inbox.remove(pos);
-                inbox.push(new_item);
-                Ok((inbox, vec![removed]))
-            } else {
-                Err(CapError::Full)
-            }
-        }
-        OverflowStrategy::Done => {
-            if let Some(pos) = inbox.iter().position(|i| i.status == Status::Done) {
                 let removed = inbox.remove(pos);
                 inbox.push(new_item);
                 Ok((inbox, vec![removed]))
