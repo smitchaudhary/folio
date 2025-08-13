@@ -4,7 +4,8 @@ use folio_bin::cli::{Cli, Commands, ConfigSubcommands};
 use folio_core::add_with_cap;
 use folio_core::{Item, ItemType, Kind, OverflowStrategy, Status};
 use folio_storage::{
-    append_to_archive, get_inbox_path, load_config, load_items_from_file, save_config, save_inbox,
+    append_to_archive, get_archive_path, get_inbox_path, load_config, load_items_from_file,
+    save_config, save_inbox,
 };
 use serde_json;
 use std::process;
@@ -33,6 +34,9 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
                 } => {
                     handle_add_command(name, r#type, author, link, note, kind)?;
                 }
+                Commands::List { status, r#type } => {
+                    handle_list_command(status.as_deref(), r#type.as_deref())?;
+                }
                 Commands::Config { subcommand } => {
                     handle_config_command(subcommand)?;
                 }
@@ -46,6 +50,104 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
             // Default behavior when no subcommand is provided
             println!("Running default TUI mode");
         }
+    }
+
+    Ok(())
+}
+
+fn handle_list_command(
+    status_filters: Option<&[String]>,
+    type_filters: Option<&[String]>,
+) -> Result<(), Box<dyn std::error::Error>> {
+    let inbox_path = get_inbox_path()?;
+    let archive_path = get_archive_path()?;
+
+    let inbox_items = load_items_from_file(&inbox_path)?;
+    let archive_items = load_items_from_file(&archive_path)?;
+
+    let mut all_items = Vec::new();
+    all_items.extend(inbox_items);
+    all_items.extend(archive_items);
+
+    let filtered_items: Vec<_> = all_items
+        .into_iter()
+        .filter(|item| {
+            if let Some(status_filters) = status_filters {
+                if !status_filters.is_empty() {
+                    let matches = status_filters.iter().any(|s| {
+                        Status::from_str(&s.to_lowercase())
+                            .map_or(false, |status| status == item.status)
+                    });
+                    if !matches {
+                        return false;
+                    }
+                }
+            }
+
+            if let Some(type_filters) = type_filters {
+                if !type_filters.is_empty() {
+                    let matches = type_filters.iter().any(|t| {
+                        ItemType::from_str(&t.to_lowercase())
+                            .map_or(false, |item_type| item_type == item.item_type)
+                    });
+                    if !matches {
+                        return false;
+                    }
+                }
+            }
+
+            true
+        })
+        .collect();
+
+    if filtered_items.is_empty() {
+        println!("No items found.");
+        return Ok(());
+    }
+
+    println!(
+        "{:<4} {:<6} {:<30} {:<10} {:<20} {:<15}",
+        "ID", "Status", "Name", "Type", "Added", "Author"
+    );
+    println!("{}", "-".repeat(100));
+
+    for (index, item) in filtered_items.iter().enumerate() {
+        let status_char = match item.status {
+            folio_core::Status::Todo => "T",
+            folio_core::Status::Doing => "D",
+            folio_core::Status::Done => "✓",
+        };
+
+        let type_abbr = match item.item_type {
+            folio_core::ItemType::Article => "art.",
+            folio_core::ItemType::Video => "vid.",
+            folio_core::ItemType::Blog => "blog",
+            folio_core::ItemType::Other => "other",
+        };
+
+        let added_date = item.added_at.format("%Y-%m-%d").to_string();
+
+        let name_display = if item.name.len() > 28 {
+            format!("{}..", &item.name[..26])
+        } else {
+            item.name.clone()
+        };
+
+        let author_display = if item.author.len() > 13 {
+            format!("{}..", &item.author[..11])
+        } else {
+            item.author.clone()
+        };
+
+        println!(
+            "{:<4} {:<6} {:<30} {:<10} {:<20} {:<15}",
+            index + 1,
+            status_char,
+            name_display,
+            type_abbr,
+            added_date,
+            author_display
+        );
     }
 
     Ok(())

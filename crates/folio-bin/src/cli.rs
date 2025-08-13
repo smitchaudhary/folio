@@ -30,7 +30,13 @@ pub enum Commands {
         kind: Option<String>,
     },
 
-    List,
+    List {
+        #[arg(long, value_delimiter = ',')]
+        status: Option<Vec<String>>,
+
+        #[arg(long, value_delimiter = ',')]
+        r#type: Option<Vec<String>>,
+    },
 
     SetStatus {
         id: usize,

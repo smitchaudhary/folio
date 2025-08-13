@@ -9,3 +9,4 @@ folio-core = { path = "../folio-core" }
 folio-storage = { path = "../folio-storage" }
 chrono = { version = "0.4", features = ["serde"] }
 serde_json = "1.0"
+strum = { version = "0.25", features = ["derive"] }
