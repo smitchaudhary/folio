@@ -53,6 +53,13 @@ impl App {
             KeyCode::Char('d') => {
                 self.state.move_selected_to_done();
             }
+            KeyCode::Enter => {
+                if let Some(item) = self.state.selected_item() {
+                    if !item.link.is_empty() {
+                        let _ = opener::open(&item.link);
+                    }
+                }
+            }
             _ => {}
         }
     }
