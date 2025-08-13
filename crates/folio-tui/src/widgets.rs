@@ -11,29 +11,31 @@ pub struct ItemsTable;
 
 impl ItemsTable {
     pub fn render(frame: &mut Frame, app_state: &AppState, area: Rect, table_state: &TableState) {
-        let (header, title) = match app_state.current_view {
+        let (header, title, border_style) = match app_state.current_view {
             View::Inbox => {
                 let title = if let Some(filter) = &app_state.filter {
-                    format!("Inbox (filtered: {})", filter)
+                    format!(" Inbox (filtered: {}) ", filter)
                 } else {
-                    "Inbox".to_string()
+                    " Inbox ".to_string()
                 };
                 (
                     Row::new(vec!["ID", "S", "Name", "Type", "Added", "Author"])
                         .style(Style::default().bold()),
                     title,
+                    Style::default().fg(Color::Blue),
                 )
             }
             View::Archive => {
                 let title = if let Some(filter) = &app_state.filter {
-                    format!("Archive (filtered: {})", filter)
+                    format!(" Archive (filtered: {}) ", filter)
                 } else {
-                    "Archive".to_string()
+                    " Archive ".to_string()
                 };
                 (
                     Row::new(vec!["ID", "R", "Name", "Done On", "Type", "Note"])
                         .style(Style::default().bold()),
                     title,
+                    Style::default().fg(Color::Green),
                 )
             }
         };
@@ -140,7 +142,12 @@ impl ItemsTable {
 
         let table = Table::new(rows, &widths)
             .header(header)
-            .block(Block::default().borders(Borders::ALL).title(title))
+            .block(
+                Block::default()
+                    .borders(Borders::ALL)
+                    .title(title)
+                    .border_style(border_style),
+            )
             .highlight_style(Style::default().reversed())
             .highlight_symbol(">>");
 

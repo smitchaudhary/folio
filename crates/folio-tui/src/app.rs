@@ -447,7 +447,12 @@ impl App {
                     Self::render_help_dialog(f);
                 }
 
-                Self::render_status_bar(f, chunks[1], &self.status_message);
+                Self::render_status_bar(
+                    f,
+                    chunks[1],
+                    &self.status_message,
+                    &self.state.current_view,
+                );
             })?;
 
             if let Some(event) = events.next().await {
@@ -547,14 +552,26 @@ impl App {
         frame: &mut ratatui::Frame,
         area: ratatui::layout::Rect,
         status_message: &Option<(String, Instant)>,
+        current_view: &View,
     ) {
-        let text = if let Some((message, _)) = status_message {
-            message.clone()
-        } else {
-            "".to_string()
+        let view_text = match current_view {
+            View::Inbox => " Inbox ",
+            View::Archive => " Archive ",
         };
 
-        let paragraph = ratatui::widgets::Paragraph::new(text)
+        let message_text = if let Some((message, _)) = status_message {
+            message.clone()
+        } else {
+            String::new()
+        };
+
+        let status_text = if message_text.is_empty() {
+            format!("View: {}", view_text)
+        } else {
+            format!("{} | View: {}", message_text, view_text)
+        };
+
+        let paragraph = ratatui::widgets::Paragraph::new(status_text)
             .style(ratatui::style::Style::default().fg(ratatui::style::Color::Gray));
 
         frame.render_widget(paragraph, area);
