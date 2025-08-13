@@ -40,6 +40,9 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
                 Commands::SetStatus { id, status } => {
                     handle_set_status_command(*id, status)?;
                 }
+                Commands::Edit { id } => {
+                    handle_edit_command(*id)?;
+                }
                 Commands::Config { subcommand } => {
                     handle_config_command(subcommand)?;
                 }
@@ -214,6 +217,90 @@ fn handle_set_status_command(
     folio_storage::save_archive(&archive_items)?;
 
     Ok(())
+}
+
+fn handle_edit_command(id: usize) -> Result<(), Box<dyn std::error::Error>> {
+    let inbox_path = get_inbox_path()?;
+    let archive_path = get_archive_path()?;
+
+    let mut inbox_items = load_items_from_file(&inbox_path)?;
+    let mut archive_items = load_items_from_file(&archive_path)?;
+
+    let (is_in_inbox, item_index) = if id > 0 && id <= inbox_items.len() {
+        let item_index = id - 1;
+        (true, item_index)
+    } else if id > inbox_items.len() && id <= inbox_items.len() + archive_items.len() {
+        let item_index = id - inbox_items.len() - 1;
+        (false, item_index)
+    } else {
+        return Err(format!("Item with ID {} not found", id).into());
+    };
+
+    let item = if is_in_inbox {
+        &mut inbox_items[item_index]
+    } else {
+        &mut archive_items[item_index]
+    };
+
+    let original_name = item.name.clone();
+    let original_type = format!("{:?}", item.item_type);
+    let original_author = item.author.clone();
+    let original_link = item.link.clone();
+    let original_note = item.note.clone();
+
+    println!("Editing item #{}. Leave blank to keep current value.", id);
+    println!("Current name: {}", original_name);
+    let name_input = prompt_for_input("Name")?;
+    if !name_input.is_empty() {
+        item.name = name_input;
+    }
+
+    println!("Current type: {}", original_type);
+    let type_input = prompt_for_input("Type")?;
+    if !type_input.is_empty() {
+        item.item_type =
+            ItemType::from_str(&type_input).map_err(|_| format!("Invalid type: {}", type_input))?;
+    }
+
+    println!("Current author: {}", original_author);
+    let author_input = prompt_for_input("Author")?;
+    if !author_input.is_empty() {
+        item.author = author_input;
+    }
+
+    println!("Current link: {}", original_link);
+    let link_input = prompt_for_input("Link")?;
+    if !link_input.is_empty() {
+        item.link = link_input;
+    }
+
+    println!("Current note: {}", original_note);
+    let note_input = prompt_for_input("Note")?;
+    if !note_input.is_empty() {
+        item.note = note_input;
+    }
+
+    item.validate()?;
+
+    if is_in_inbox {
+        save_inbox(&inbox_items)?;
+    } else {
+        folio_storage::save_archive(&archive_items)?;
+    }
+
+    println!("Item #{} updated successfully", id);
+    Ok(())
+}
+
+fn prompt_for_input(field_name: &str) -> Result<String, Box<dyn std::error::Error>> {
+    use std::io::{Write, stdin, stdout};
+
+    print!("{}: ", field_name);
+    stdout().flush()?;
+
+    let mut input = String::new();
+    stdin().read_line(&mut input)?;
+    Ok(input.trim().to_string())
 }
 
 fn handle_add_command(
