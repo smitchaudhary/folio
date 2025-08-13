@@ -30,6 +30,9 @@ pub struct App {
     pub cap_warning_message: String,
     pub pending_add_item: Option<Item>,
     pub show_done_confirmation: bool,
+    pub show_config_dialog: bool,
+    pub config_max_items_input: String,
+    pub config_overflow_strategy: usize,
 }
 
 impl App {
@@ -50,6 +53,9 @@ impl App {
             cap_warning_message: String::new(),
             pending_add_item: None,
             show_done_confirmation: false,
+            show_config_dialog: false,
+            config_max_items_input: String::new(),
+            config_overflow_strategy: 0,
         }
     }
 
@@ -122,6 +128,33 @@ impl App {
                 }
                 KeyCode::Char('n') | KeyCode::Char('N') | KeyCode::Esc => {
                     self.show_done_confirmation = false;
+                }
+                _ => {}
+            }
+            return;
+        }
+
+        if self.show_config_dialog {
+            match key_event.code {
+                KeyCode::Esc => {
+                    self.show_config_dialog = false;
+                }
+                KeyCode::Enter => {
+                    self.save_config_changes();
+                }
+                KeyCode::Char('j') | KeyCode::Down => {
+                    self.config_overflow_strategy = (self.config_overflow_strategy + 1) % 3;
+                }
+                KeyCode::Char('k') | KeyCode::Up => {
+                    self.config_overflow_strategy = (self.config_overflow_strategy + 2) % 3;
+                }
+                KeyCode::Char(c) if c.is_ascii_digit() && key_event.code != KeyCode::Enter => {
+                    if self.config_max_items_input.len() < 4 {
+                        self.config_max_items_input.push(c);
+                    }
+                }
+                KeyCode::Backspace => {
+                    self.config_max_items_input.pop();
                 }
                 _ => {}
             }
@@ -253,6 +286,20 @@ impl App {
             KeyCode::Char('?') => {
                 self.show_help = true;
             }
+            KeyCode::Char('C') => {
+                self.show_config_dialog = true;
+                if let Ok(config) = load_config() {
+                    self.config_max_items_input = config.max_items.to_string();
+                    self.config_overflow_strategy = match config.archive_on_overflow {
+                        OverflowStrategy::Abort => 0,
+                        OverflowStrategy::Todo => 1,
+                        OverflowStrategy::Any => 2,
+                    };
+                } else {
+                    self.config_max_items_input = "100".to_string();
+                    self.config_overflow_strategy = 0;
+                }
+            }
             KeyCode::Tab => {
                 match self.state.current_view {
                     View::Inbox => self.state.current_view = View::Archive,
@@ -322,6 +369,41 @@ impl App {
                 folio_core::Kind::Reference => item.kind = folio_core::Kind::Normal,
             }
             let _ = self.save_data();
+        }
+    }
+
+    fn save_config_changes(&mut self) {
+        match self.config_max_items_input.parse::<u32>() {
+            Ok(max_items) => {
+                if max_items > 0 && max_items <= 1000 {
+                    let strategy = match self.config_overflow_strategy {
+                        0 => OverflowStrategy::Abort,
+                        1 => OverflowStrategy::Todo,
+                        2 => OverflowStrategy::Any,
+                        _ => OverflowStrategy::Abort,
+                    };
+
+                    let mut config = load_config().unwrap_or_default();
+
+                    config.max_items = max_items;
+                    config.archive_on_overflow = strategy;
+
+                    match folio_storage::save_config(&config) {
+                        Ok(_) => {
+                            self.show_status_message("Config saved successfully".to_string());
+                            self.show_config_dialog = false;
+                        }
+                        Err(_) => {
+                            self.show_status_message("Failed to save config".to_string());
+                        }
+                    }
+                } else {
+                    self.show_status_message("Max items must be 1-1000".to_string());
+                }
+            }
+            Err(_) => {
+                self.show_status_message("Invalid number format".to_string());
+            }
         }
     }
 
@@ -575,6 +657,14 @@ impl App {
                     Self::render_done_confirmation_dialog(f);
                 }
 
+                if self.show_config_dialog {
+                    Self::render_config_dialog(
+                        f,
+                        &self.config_max_items_input,
+                        self.config_overflow_strategy,
+                    );
+                }
+
                 Self::render_status_bar(
                     f,
                     chunks[1],
@@ -664,6 +754,9 @@ impl App {
             ratatui::text::Line::from("  x        Delete item"),
             ratatui::text::Line::from("  r        Toggle reference (Archive only)"),
             ratatui::text::Line::from(""),
+            ratatui::text::Line::from("System:"),
+            ratatui::text::Line::from("  C        Configure settings"),
+            ratatui::text::Line::from(""),
             ratatui::text::Line::from("General:"),
             ratatui::text::Line::from("  ?        Show this help"),
             ratatui::text::Line::from("  q/Esc    Quit"),
@@ -732,6 +825,52 @@ impl App {
         let paragraph = ratatui::widgets::Paragraph::new(text)
             .block(block)
             .alignment(ratatui::layout::Alignment::Center);
+
+        frame.render_widget(paragraph, popup_area);
+    }
+
+    fn render_config_dialog(
+        frame: &mut ratatui::Frame,
+        max_items_input: &str,
+        overflow_strategy_index: usize,
+    ) {
+        let area = frame.size();
+        let popup_area = ratatui::layout::Rect {
+            x: area.width / 2 - 30,
+            y: area.height / 2 - 8,
+            width: 60.min(area.width),
+            height: 16.min(area.height),
+        };
+
+        frame.render_widget(ratatui::widgets::Clear, popup_area);
+
+        let block = ratatui::widgets::Block::default()
+            .title("Configuration")
+            .borders(ratatui::widgets::Borders::ALL);
+
+        let strategies = ["abort", "todo", "any"];
+        let selected_strategy = strategies[overflow_strategy_index];
+
+        let text = vec![
+            ratatui::text::Line::from(""),
+            ratatui::text::Line::from(format!("Max Items: {}", max_items_input)),
+            ratatui::text::Line::from(""),
+            ratatui::text::Line::from(format!(
+                "Overflow Strategy: {} (↑/↓ to cycle)",
+                selected_strategy
+            )),
+            ratatui::text::Line::from(""),
+            ratatui::text::Line::from("Controls:"),
+            ratatui::text::Line::from("  Enter  - Save changes"),
+            ratatui::text::Line::from("  Esc    - Cancel"),
+            ratatui::text::Line::from("  ↑/↓    - Cycle strategy"),
+            ratatui::text::Line::from("  0-9    - Edit max items"),
+            ratatui::text::Line::from("  Backspace - Delete last digit"),
+        ];
+
+        let paragraph = ratatui::widgets::Paragraph::new(text)
+            .block(block)
+            .alignment(ratatui::layout::Alignment::Left);
 
         frame.render_widget(paragraph, popup_area);
     }
