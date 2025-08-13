@@ -10,7 +10,7 @@ use crate::widgets::ItemsTable;
 use chrono::Utc;
 use crossterm::event::{KeyCode, KeyEvent};
 use ratatui::widgets::TableState;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 pub struct App {
     pub should_quit: bool,
@@ -19,6 +19,7 @@ pub struct App {
     pub add_form: AddItemForm,
     pub show_delete_confirmation: bool,
     pub show_help: bool,
+    pub status_message: Option<(String, Instant)>,
 }
 
 impl App {
@@ -30,6 +31,7 @@ impl App {
             add_form: AddItemForm::new(),
             show_delete_confirmation: false,
             show_help: false,
+            status_message: None,
         }
     }
 
@@ -43,10 +45,15 @@ impl App {
         Ok(())
     }
 
-    pub async fn save_data(&self) -> Result<(), Box<dyn std::error::Error>> {
+    pub async fn save_data(&mut self) -> Result<(), Box<dyn std::error::Error>> {
         save_inbox_items(self.state.get_inbox_items()).await?;
         save_archive_items(self.state.get_archive_items()).await?;
+        self.show_status_message("Saved".to_string());
         Ok(())
+    }
+
+    fn show_status_message(&mut self, message: String) {
+        self.status_message = Some((message, Instant::now()));
     }
 
     fn handle_key_event(&mut self, key_event: KeyEvent) {
@@ -102,6 +109,7 @@ impl App {
             KeyCode::Char('s') => {
                 if let Some(done_item) = self.state.cycle_selected_item_status() {
                     let _ = append_item_to_archive(&done_item);
+                    self.show_status_message("Item archived".to_string());
                 } else {
                     let _ = self.save_data();
                 }
@@ -114,6 +122,7 @@ impl App {
             KeyCode::Char('d') => {
                 if let Some(done_item) = self.state.move_selected_to_done() {
                     let _ = append_item_to_archive(&done_item);
+                    self.show_status_message("Item archived".to_string());
                 } else {
                     let _ = self.save_data();
                 }
@@ -126,6 +135,7 @@ impl App {
             }
             KeyCode::Char('r') => {
                 self.toggle_reference_status();
+                self.show_status_message("Reference status toggled".to_string());
             }
             KeyCode::Char('?') => {
                 self.show_help = true;
@@ -137,11 +147,19 @@ impl App {
                 }
                 self.state.selected_index = 0;
                 self.table_state.select(Some(0));
+                self.show_status_message(
+                    match self.state.current_view {
+                        View::Inbox => "Switched to Inbox",
+                        View::Archive => "Switched to Archive",
+                    }
+                    .to_string(),
+                );
             }
             KeyCode::Enter => {
                 if let Some(item) = self.state.selected_item() {
                     if !item.link.is_empty() {
                         let _ = opener::open(&item.link);
+                        self.show_status_message("Opening link...".to_string());
                     }
                 }
             }
@@ -176,6 +194,7 @@ impl App {
                         self.state.selected_index = self.state.inbox_items.len() - 1;
                     }
                     let _ = self.save_data();
+                    self.show_status_message("Item deleted".to_string());
                 }
             }
             View::Archive => {
@@ -189,6 +208,7 @@ impl App {
                         self.state.selected_index = self.state.archive_items.len() - 1;
                     }
                     let _ = self.save_data();
+                    self.show_status_message("Item deleted".to_string());
                 }
             }
         }
@@ -251,6 +271,7 @@ impl App {
         self.state.inbox_items.push(new_item);
 
         let _ = self.save_data();
+        self.show_status_message("Item added".to_string());
 
         true
     }
@@ -268,7 +289,10 @@ impl App {
         loop {
             terminal.draw(|f| {
                 let chunks = ratatui::layout::Layout::default()
-                    .constraints([ratatui::layout::Constraint::Percentage(100)])
+                    .constraints([
+                        ratatui::layout::Constraint::Min(3),
+                        ratatui::layout::Constraint::Length(1),
+                    ])
                     .split(f.size());
 
                 ItemsTable::render(f, &self.state, chunks[0], &self.table_state);
@@ -281,6 +305,8 @@ impl App {
                 if self.show_help {
                     Self::render_help_dialog(f);
                 }
+
+                Self::render_status_bar(f, chunks[1], &self.status_message);
             })?;
 
             if let Some(event) = events.next().await {
@@ -288,7 +314,14 @@ impl App {
                     AppEvent::Key(key_event) => {
                         self.handle_key_event(key_event);
                     }
-                    AppEvent::Tick => {}
+                    AppEvent::Tick => {
+                        // Clear status message after 2 seconds
+                        if let Some((_, time)) = self.status_message {
+                            if time.elapsed() > Duration::from_secs(2) {
+                                self.status_message = None;
+                            }
+                        }
+                    }
                 }
             }
 
@@ -367,5 +400,22 @@ impl App {
             .alignment(ratatui::layout::Alignment::Left);
 
         frame.render_widget(paragraph, popup_area);
+    }
+
+    fn render_status_bar(
+        frame: &mut ratatui::Frame,
+        area: ratatui::layout::Rect,
+        status_message: &Option<(String, Instant)>,
+    ) {
+        let text = if let Some((message, _)) = status_message {
+            message.clone()
+        } else {
+            "".to_string()
+        };
+
+        let paragraph = ratatui::widgets::Paragraph::new(text)
+            .style(ratatui::style::Style::default().fg(ratatui::style::Color::Gray));
+
+        frame.render_widget(paragraph, area);
     }
 }
