@@ -9,7 +9,7 @@ mod config;
 pub use config::{Config, OverflowStrategy};
 
 mod status;
-pub use status::cycle_status;
+pub use status::{cycle_status, update_timestamps};
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, EnumString)]
 pub enum ItemType {
