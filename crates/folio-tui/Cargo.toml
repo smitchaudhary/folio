@@ -5,5 +5,6 @@ edition = "2024"
 
 [dependencies]
 crossterm = { version = "0.27", features = ["event-stream"] }
+ratatui = "0.26"
 tokio = { version = "1.0", features = ["full"] }
 tokio-stream = "0.1"
