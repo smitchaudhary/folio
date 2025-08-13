@@ -1,6 +1,6 @@
 use folio_core::Item;
 use serde_json;
-use std::fs::File;
+use std::fs::{self, File};
 use std::io::{BufRead, BufReader, Read};
 use std::path::Path;
 
@@ -63,4 +63,16 @@ pub fn serialize_items_to_jsonl(items: &[Item]) -> Result<String, serde_json::Er
     }
     
     Ok(jsonl)
+}
+
+pub fn ensure_folio_dir() -> Result<(), Box<dyn std::error::Error>> {
+    let folio_dir = dirs::home_dir()
+        .ok_or("Could not determine home directory")?
+        .join(".folio");
+    
+    if !folio_dir.exists() {
+        fs::create_dir_all(&folio_dir)?;
+    }
+    
+    Ok(())
 }
