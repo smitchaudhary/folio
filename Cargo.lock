@@ -348,6 +348,7 @@ dependencies = [
 name = "folio-tui"
 version = "0.1.0"
 dependencies = [
+ "chrono",
  "crossterm",
  "folio-core",
  "folio-storage",

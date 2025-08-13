@@ -3,9 +3,11 @@ use crate::data::{
     save_inbox_items,
 };
 use crate::event::{AppEvent, EventHandler};
+use crate::forms::AddItemForm;
 use crate::state::AppState;
 use crate::terminal::{restore_terminal, setup_terminal};
 use crate::widgets::ItemsTable;
+use chrono::Utc;
 use crossterm::event::{KeyCode, KeyEvent};
 use ratatui::widgets::TableState;
 use std::time::Duration;
@@ -14,6 +16,7 @@ pub struct App {
     pub should_quit: bool,
     pub state: AppState,
     pub table_state: TableState,
+    pub add_form: AddItemForm,
 }
 
 impl App {
@@ -22,6 +25,7 @@ impl App {
             should_quit: false,
             state: AppState::new(),
             table_state: TableState::default(),
+            add_form: AddItemForm::new(),
         }
     }
 
@@ -42,6 +46,24 @@ impl App {
     }
 
     fn handle_key_event(&mut self, key_event: KeyEvent) {
+        // If the add form is visible, handle form-specific keys
+        if self.add_form.is_visible {
+            match key_event.code {
+                KeyCode::Esc => {
+                    self.add_form.toggle_visibility();
+                }
+                KeyCode::Enter => {
+                    if self.submit_add_form() {
+                        self.add_form.toggle_visibility();
+                    }
+                }
+                _ => {
+                    self.add_form.handle_key(key_event);
+                }
+            }
+            return;
+        }
+
         match key_event.code {
             KeyCode::Char('q') => self.should_quit = true,
             KeyCode::Esc => self.should_quit = true,
@@ -72,6 +94,9 @@ impl App {
                     let _ = self.save_data();
                 }
             }
+            KeyCode::Char('a') => {
+                self.add_form.toggle_visibility();
+            }
             KeyCode::Enter => {
                 if let Some(item) = self.state.selected_item() {
                     if !item.link.is_empty() {
@@ -81,6 +106,67 @@ impl App {
             }
             _ => {}
         }
+    }
+
+    fn submit_add_form(&mut self) -> bool {
+        let name = self
+            .add_form
+            .get_field_value("name")
+            .cloned()
+            .unwrap_or_default();
+        if name.is_empty() {
+            return false;
+        }
+
+        let item_type = self
+            .add_form
+            .get_field_value("type")
+            .cloned()
+            .unwrap_or_default();
+        let author = self
+            .add_form
+            .get_field_value("author")
+            .cloned()
+            .unwrap_or_default();
+        let link = self
+            .add_form
+            .get_field_value("link")
+            .cloned()
+            .unwrap_or_default();
+        let note = self
+            .add_form
+            .get_field_value("note")
+            .cloned()
+            .unwrap_or_default();
+
+        let new_item = folio_core::Item {
+            name,
+            item_type: match item_type.as_str() {
+                "video" => folio_core::ItemType::Video,
+                "blog" => folio_core::ItemType::Blog,
+                "other" => folio_core::ItemType::Other,
+                _ => folio_core::ItemType::Article,
+            },
+            status: folio_core::Status::Todo,
+            author,
+            link,
+            added_at: Utc::now(),
+            started_at: None,
+            finished_at: None,
+            note,
+            kind: folio_core::Kind::Normal,
+            version: 1,
+        };
+
+        if new_item.validate().is_err() {
+            return false;
+        }
+
+        self.state.inbox_items.push(new_item);
+
+        let _ = self.save_data();
+
+        true
     }
 
     pub async fn run(&mut self) -> Result<(), Box<dyn std::error::Error>> {
@@ -100,6 +186,7 @@ impl App {
                     .split(f.size());
 
                 ItemsTable::render(f, &self.state, chunks[0], &self.table_state);
+                self.add_form.render(f);
             })?;
 
             if let Some(event) = events.next().await {
