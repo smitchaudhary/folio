@@ -2,22 +2,22 @@ use folio_core::Item;
 use serde_json;
 use std::fs::{self, File};
 use std::io::{BufRead, BufReader, Read};
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 pub mod fs_atomic;
 
 pub fn deserialize_jsonl_from_string(jsonl_str: &str) -> Result<Vec<Item>, serde_json::Error> {
     let mut items = Vec::new();
-    
+
     for line in jsonl_str.lines() {
         if line.trim().is_empty() {
             continue;
         }
-        
+
         let item: Item = serde_json::from_str(line)?;
         items.push(item);
     }
-    
+
     Ok(items)
 }
 
@@ -26,18 +26,18 @@ pub fn deserialize_jsonl_from_reader<R: Read>(
 ) -> Result<Vec<Item>, Box<dyn std::error::Error>> {
     let buf_reader = BufReader::new(reader);
     let mut items = Vec::new();
-    
+
     for line in buf_reader.lines() {
         let line = line?;
-        
+
         if line.trim().is_empty() {
             continue;
         }
-        
+
         let item: Item = serde_json::from_str(&line)?;
         items.push(item);
     }
-    
+
     Ok(items)
 }
 
@@ -55,24 +55,45 @@ pub fn load_items_from_file<P: AsRef<Path>>(
 
 pub fn serialize_items_to_jsonl(items: &[Item]) -> Result<String, serde_json::Error> {
     let mut jsonl = String::new();
-    
+
     for item in items {
         let line = serde_json::to_string(item)?;
         jsonl.push_str(&line);
         jsonl.push('\n');
     }
-    
+
     Ok(jsonl)
 }
 
 pub fn ensure_folio_dir() -> Result<(), Box<dyn std::error::Error>> {
-    let folio_dir = dirs::home_dir()
-        .ok_or("Could not determine home directory")?
-        .join(".folio");
-    
+    let folio_dir = get_folio_dir()?;
+
     if !folio_dir.exists() {
         fs::create_dir_all(&folio_dir)?;
     }
-    
+
     Ok(())
+}
+
+pub fn get_folio_dir() -> Result<PathBuf, Box<dyn std::error::Error>> {
+    let folio_dir = dirs::home_dir()
+        .ok_or("Could not determine home directory")?
+        .join(".folio");
+
+    Ok(folio_dir)
+}
+
+pub fn get_inbox_path() -> Result<PathBuf, Box<dyn std::error::Error>> {
+    let inbox_path = get_folio_dir()?.join("inbox.jsonl");
+    Ok(inbox_path)
+}
+
+pub fn get_archive_path() -> Result<PathBuf, Box<dyn std::error::Error>> {
+    let archive_path = get_folio_dir()?.join("archive.jsonl");
+    Ok(archive_path)
+}
+
+pub fn get_config_path() -> Result<PathBuf, Box<dyn std::error::Error>> {
+    let config_path = get_folio_dir()?.join("config.json");
+    Ok(config_path)
 }
