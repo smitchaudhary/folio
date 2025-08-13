@@ -67,7 +67,9 @@ pub struct Item {
 impl Item {
     pub fn validate(&self) -> Result<(), CoreError> {
         if self.name.is_empty() {
-            return Err(CoreError::ValidationError("Name cannot be empty".to_string()));
+            return Err(CoreError::ValidationError(
+                "Name cannot be empty".to_string(),
+            ));
         }
         Ok(())
     }
