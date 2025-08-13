@@ -3,7 +3,7 @@ use crate::data::{
     save_inbox_items,
 };
 use crate::event::{AppEvent, EventHandler};
-use crate::forms::AddItemForm;
+use crate::forms::{AddItemForm, EditItemForm};
 use crate::state::{AppState, View};
 use crate::terminal::{restore_terminal, setup_terminal};
 use crate::widgets::ItemsTable;
@@ -17,6 +17,7 @@ pub struct App {
     pub state: AppState,
     pub table_state: TableState,
     pub add_form: AddItemForm,
+    pub edit_form: EditItemForm,
     pub show_delete_confirmation: bool,
     pub show_help: bool,
     pub status_message: Option<(String, Instant)>,
@@ -31,6 +32,7 @@ impl App {
             state: AppState::new(),
             table_state: TableState::default(),
             add_form: AddItemForm::new(),
+            edit_form: EditItemForm::new(),
             show_delete_confirmation: false,
             show_help: false,
             status_message: None,
@@ -94,6 +96,23 @@ impl App {
                 }
                 _ => {
                     self.add_form.handle_key(key_event);
+                }
+            }
+            return;
+        }
+        
+        if self.edit_form.is_visible {
+            match key_event.code {
+                KeyCode::Esc => {
+                    self.edit_form.toggle_visibility();
+                }
+                KeyCode::Char('s') if key_event.modifiers.contains(crossterm::event::KeyModifiers::CONTROL) => {
+                    if self.submit_edit_form() {
+                        self.edit_form.toggle_visibility();
+                    }
+                }
+                _ => {
+                    self.edit_form.handle_key(key_event);
                 }
             }
             return;
@@ -171,6 +190,9 @@ impl App {
                 self.toggle_reference_status();
                 self.show_status_message("Reference status toggled".to_string());
             }
+            KeyCode::Char('e') => {
+                self.start_edit_item();
+            }
             KeyCode::Char('?') => {
                 self.show_help = true;
             }
@@ -212,6 +234,17 @@ impl App {
                 folio_core::Kind::Reference => item.kind = folio_core::Kind::Normal,
             }
             let _ = self.save_data();
+        }
+    }
+    
+    fn start_edit_item(&mut self) {
+        // Check if an item is selected
+        if let Some(item) = self.state.selected_item() {
+            // Populate the edit form with the item's data
+            self.edit_form.populate_fields(item);
+            self.edit_form.toggle_visibility();
+        } else {
+            self.show_status_message("No item selected".to_string());
         }
     }
 
@@ -309,6 +342,63 @@ impl App {
 
         true
     }
+    
+    fn submit_edit_form(&mut self) -> bool {
+        let name = self
+            .edit_form
+            .get_field_value("name")
+            .cloned()
+            .unwrap_or_default();
+        if name.is_empty() {
+            return false;
+        }
+
+        let item_type = self
+            .edit_form
+            .get_field_value("type")
+            .cloned()
+            .unwrap_or_default();
+        let author = self
+            .edit_form
+            .get_field_value("author")
+            .cloned()
+            .unwrap_or_default();
+        let link = self
+            .edit_form
+            .get_field_value("link")
+            .cloned()
+            .unwrap_or_default();
+        let note = self
+            .edit_form
+            .get_field_value("note")
+            .cloned()
+            .unwrap_or_default();
+
+        // Update the selected item with the new values
+        if let Some(item) = self.state.selected_item_mut() {
+            item.name = name;
+            item.item_type = match item_type.as_str() {
+                "video" => folio_core::ItemType::Video,
+                "blog" => folio_core::ItemType::Blog,
+                "other" => folio_core::ItemType::Other,
+                _ => folio_core::ItemType::Article,
+            };
+            item.author = author;
+            item.link = link;
+            item.note = note;
+            
+            // Validate the updated item
+            if item.validate().is_err() {
+                return false;
+            }
+            
+            let _ = self.save_data();
+            self.show_status_message("Item updated".to_string());
+            true
+        } else {
+            false
+        }
+    }
 
     pub async fn run(&mut self) -> Result<(), Box<dyn std::error::Error>> {
         self.load_data().await?;
@@ -331,6 +421,7 @@ impl App {
 
                 ItemsTable::render(f, &self.state, chunks[0], &self.table_state);
                 self.add_form.render(f);
+                self.edit_form.render(f);
 
                 if self.filter_input_mode {
                     Self::render_filter_input(f, &self.filter_input);
@@ -425,6 +516,7 @@ impl App {
             ratatui::text::Line::from("  i        Set status to doing"),
             ratatui::text::Line::from("  d        Set status to done"),
             ratatui::text::Line::from("  a        Add new item"),
+            ratatui::text::Line::from("  e        Edit item"),
             ratatui::text::Line::from("  x        Delete item"),
             ratatui::text::Line::from("  r        Toggle reference (Archive only)"),
             ratatui::text::Line::from(""),
