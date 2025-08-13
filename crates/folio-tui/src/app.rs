@@ -47,6 +47,12 @@ impl App {
             KeyCode::Char('s') => {
                 self.state.cycle_selected_item_status();
             }
+            KeyCode::Char('i') => {
+                self.state.move_selected_to_doing();
+            }
+            KeyCode::Char('d') => {
+                self.state.move_selected_to_done();
+            }
             _ => {}
         }
     }
