@@ -14,3 +14,9 @@ pub enum CoreError {
     #[error("Inbox is full")]
     InboxFull,
 }
+
+#[derive(Error, Debug)]
+pub enum CapError {
+    #[error("Inbox is full")]
+    Full,
+}

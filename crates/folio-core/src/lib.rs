@@ -3,7 +3,7 @@ use serde::{Deserialize, Serialize};
 use strum::EnumString;
 
 mod error;
-pub use error::CoreError;
+pub use error::{CoreError, CapError};
 
 mod config;
 pub use config::{Config, OverflowStrategy};
@@ -11,6 +11,8 @@ pub use config::{Config, OverflowStrategy};
 mod status;
 pub use status::{cycle_status, update_timestamps};
 
+mod cap;
+pub use cap::add_with_cap;
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, EnumString)]
 pub enum ItemType {
     #[serde(rename = "article")]
