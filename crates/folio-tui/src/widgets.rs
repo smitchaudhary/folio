@@ -1,7 +1,7 @@
 use ratatui::{
     Frame,
     layout::{Constraint, Rect},
-    style::{Style, Stylize},
+    style::{Color, Style, Stylize},
     widgets::{Block, Borders, Row, Table, TableState},
 };
 
@@ -36,6 +36,12 @@ impl ItemsTable {
                         folio_core::Status::Done => "✓",
                     };
 
+                    let status_style = match item.status {
+                        folio_core::Status::Todo => Style::default().fg(Color::DarkGray),
+                        folio_core::Status::Doing => Style::default().fg(Color::Yellow),
+                        folio_core::Status::Done => Style::default().fg(Color::Green),
+                    };
+
                     let item_type = match item.item_type {
                         folio_core::ItemType::Article => "art.",
                         folio_core::ItemType::Video => "vid.",
@@ -53,11 +59,17 @@ impl ItemsTable {
                         added_date,
                         item.author.clone(),
                     ])
+                    .style(status_style)
                 }
                 View::Archive => {
                     let reference_char = match item.kind {
                         folio_core::Kind::Normal => "✓",
                         folio_core::Kind::Reference => "☆",
+                    };
+
+                    let reference_style = match item.kind {
+                        folio_core::Kind::Normal => Style::default().fg(Color::White),
+                        folio_core::Kind::Reference => Style::default().fg(Color::Blue),
                     };
 
                     let done_date = item
@@ -87,6 +99,7 @@ impl ItemsTable {
                         item_type.to_string(),
                         note,
                     ])
+                    .style(reference_style)
                 }
             });
 
