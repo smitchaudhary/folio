@@ -1,0 +1,8 @@
+[workspace]
+members = [
+    "crates/folio-bin",
+    "crates/folio-core",
+    "crates/folio-storage",
+    "crates/folio-tui",
+]
+resolver = "2"
