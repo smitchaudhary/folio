@@ -11,6 +11,7 @@ pub struct AppState {
     pub archive_items: Vec<Item>,
     pub selected_index: usize,
     pub current_view: View,
+    pub filter: Option<String>,
 }
 
 impl AppState {
@@ -20,6 +21,7 @@ impl AppState {
             archive_items: vec![],
             selected_index: 0,
             current_view: View::Inbox,
+            filter: None,
         }
     }
 
@@ -156,5 +158,29 @@ impl AppState {
 
     pub fn get_archive_items(&self) -> &[Item] {
         &self.archive_items
+    }
+
+    pub fn filtered_items(&self) -> Vec<usize> {
+        let items = self.current_items();
+
+        if let Some(filter) = &self.filter {
+            items
+                .iter()
+                .enumerate()
+                .filter(|(_, item)| {
+                    let text_match = item.name.to_lowercase().contains(&filter.to_lowercase())
+                        || item.author.to_lowercase().contains(&filter.to_lowercase());
+
+                    text_match
+                })
+                .map(|(index, _)| index)
+                .collect()
+        } else {
+            (0..items.len()).collect()
+        }
+    }
+
+    pub fn set_filter(&mut self, filter: Option<String>) {
+        self.filter = filter;
     }
 }

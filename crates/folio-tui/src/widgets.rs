@@ -12,23 +12,38 @@ pub struct ItemsTable;
 impl ItemsTable {
     pub fn render(frame: &mut Frame, app_state: &AppState, area: Rect, table_state: &TableState) {
         let (header, title) = match app_state.current_view {
-            View::Inbox => (
-                Row::new(vec!["ID", "S", "Name", "Type", "Added", "Author"])
-                    .style(Style::default().bold()),
-                "Inbox",
-            ),
-            View::Archive => (
-                Row::new(vec!["ID", "R", "Name", "Done On", "Type", "Note"])
-                    .style(Style::default().bold()),
-                "Archive",
-            ),
+            View::Inbox => {
+                let title = if let Some(filter) = &app_state.filter {
+                    format!("Inbox (filtered: {})", filter)
+                } else {
+                    "Inbox".to_string()
+                };
+                (
+                    Row::new(vec!["ID", "S", "Name", "Type", "Added", "Author"])
+                        .style(Style::default().bold()),
+                    title,
+                )
+            }
+            View::Archive => {
+                let title = if let Some(filter) = &app_state.filter {
+                    format!("Archive (filtered: {})", filter)
+                } else {
+                    "Archive".to_string()
+                };
+                (
+                    Row::new(vec!["ID", "R", "Name", "Done On", "Type", "Note"])
+                        .style(Style::default().bold()),
+                    title,
+                )
+            }
         };
 
-        let rows = app_state
-            .current_items()
-            .iter()
-            .enumerate()
-            .map(|(i, item)| match app_state.current_view {
+        let items = app_state.current_items();
+        let filtered_indices = app_state.filtered_items();
+
+        let rows = filtered_indices.iter().map(|&i| {
+            let item = &items[i];
+            match app_state.current_view {
                 View::Inbox => {
                     let status_char = match item.status {
                         folio_core::Status::Todo => "T",
@@ -101,7 +116,8 @@ impl ItemsTable {
                     ])
                     .style(reference_style)
                 }
-            });
+            }
+        });
 
         let widths = match app_state.current_view {
             View::Inbox => vec![

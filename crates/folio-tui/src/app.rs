@@ -20,6 +20,8 @@ pub struct App {
     pub show_delete_confirmation: bool,
     pub show_help: bool,
     pub status_message: Option<(String, Instant)>,
+    pub filter_input_mode: bool,
+    pub filter_input: String,
 }
 
 impl App {
@@ -32,6 +34,8 @@ impl App {
             show_delete_confirmation: false,
             show_help: false,
             status_message: None,
+            filter_input_mode: false,
+            filter_input: String::new(),
         }
     }
 
@@ -95,9 +99,39 @@ impl App {
             return;
         }
 
+        if self.filter_input_mode {
+            match key_event.code {
+                KeyCode::Esc => {
+                    self.filter_input_mode = false;
+                    self.filter_input.clear();
+                    self.state.set_filter(None);
+                }
+                KeyCode::Enter => {
+                    self.filter_input_mode = false;
+                    if self.filter_input.is_empty() {
+                        self.state.set_filter(None);
+                    } else {
+                        self.state.set_filter(Some(self.filter_input.clone()));
+                    }
+                }
+                KeyCode::Backspace => {
+                    self.filter_input.pop();
+                }
+                KeyCode::Char(c) => {
+                    self.filter_input.push(c);
+                }
+                _ => {}
+            }
+            return;
+        }
+
         match key_event.code {
             KeyCode::Char('q') => self.should_quit = true,
             KeyCode::Esc => self.should_quit = true,
+            KeyCode::Char('/') => {
+                self.filter_input_mode = true;
+                self.filter_input.clear();
+            }
             KeyCode::Down => {
                 self.state.next_item();
                 self.table_state.select(Some(self.state.selected_index));
@@ -298,6 +332,10 @@ impl App {
                 ItemsTable::render(f, &self.state, chunks[0], &self.table_state);
                 self.add_form.render(f);
 
+                if self.filter_input_mode {
+                    Self::render_filter_input(f, &self.filter_input);
+                }
+
                 if self.show_delete_confirmation {
                     Self::render_delete_confirmation(f);
                 }
@@ -417,5 +455,32 @@ impl App {
             .style(ratatui::style::Style::default().fg(ratatui::style::Color::Gray));
 
         frame.render_widget(paragraph, area);
+    }
+
+    fn render_filter_input(frame: &mut ratatui::Frame, filter_input: &str) {
+        let area = frame.size();
+        let input_area = ratatui::layout::Rect {
+            x: 0,
+            y: area.height.saturating_sub(3),
+            width: area.width.min(50),
+            height: 3.min(area.height),
+        };
+
+        frame.render_widget(ratatui::widgets::Clear, input_area);
+
+        let block = ratatui::widgets::Block::default()
+            .title("Filter")
+            .borders(ratatui::widgets::Borders::ALL);
+
+        let text = vec![
+            ratatui::text::Line::from(format!("Filter: {}", filter_input)),
+            ratatui::text::Line::from("Press Enter to apply, Esc to cancel"),
+        ];
+
+        let paragraph = ratatui::widgets::Paragraph::new(text)
+            .block(block)
+            .alignment(ratatui::layout::Alignment::Left);
+
+        frame.render_widget(paragraph, input_area);
     }
 }
