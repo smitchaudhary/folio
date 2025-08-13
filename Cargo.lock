@@ -338,6 +338,7 @@ name = "folio-tui"
 version = "0.1.0"
 dependencies = [
  "crossterm",
+ "folio-core",
  "ratatui",
  "tokio",
  "tokio-stream",
