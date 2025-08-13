@@ -2,6 +2,9 @@ use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use strum::EnumString;
 
+mod error;
+pub use error::CoreError;
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, EnumString)]
 pub enum ItemType {
     #[serde(rename = "article")]
@@ -59,9 +62,9 @@ pub struct Item {
 }
 
 impl Item {
-    pub fn validate(&self) -> Result<(), String> {
+    pub fn validate(&self) -> Result<(), CoreError> {
         if self.name.is_empty() {
-            return Err("Name cannot be empty".to_string());
+            return Err(CoreError::ValidationError("Name cannot be empty".to_string()));
         }
         Ok(())
     }
