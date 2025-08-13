@@ -192,7 +192,10 @@ dependencies = [
 name = "folio-bin"
 version = "0.1.0"
 dependencies = [
+ "chrono",
  "clap",
+ "folio-core",
+ "folio-storage",
 ]
 
 [[package]]
