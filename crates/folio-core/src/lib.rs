@@ -13,6 +13,10 @@ pub use status::{cycle_status, update_timestamps};
 
 mod cap;
 pub use cap::add_with_cap;
+
+mod archive;
+pub use archive::{should_auto_archive, move_to_archive};
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, EnumString)]
 pub enum ItemType {
     #[serde(rename = "article")]
