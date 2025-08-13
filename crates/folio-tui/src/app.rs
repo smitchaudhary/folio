@@ -3,6 +3,7 @@ use crate::event::{AppEvent, EventHandler};
 use crate::state::AppState;
 use crate::terminal::{restore_terminal, setup_terminal};
 use crate::widgets::ItemsTable;
+use crossterm::event::{KeyCode, KeyEvent};
 use ratatui::widgets::TableState;
 use std::time::Duration;
 
@@ -31,11 +32,32 @@ impl App {
         Ok(())
     }
 
+    fn handle_key_event(&mut self, key_event: KeyEvent) {
+        match key_event.code {
+            KeyCode::Char('q') => self.should_quit = true,
+            KeyCode::Esc => self.should_quit = true,
+            KeyCode::Down => {
+                self.state.next_item();
+                self.table_state.select(Some(self.state.selected_index));
+            }
+            KeyCode::Up => {
+                self.state.previous_item();
+                self.table_state.select(Some(self.state.selected_index));
+            }
+            _ => {}
+        }
+    }
+
     pub async fn run(&mut self) -> Result<(), Box<dyn std::error::Error>> {
         self.load_data().await?;
 
         let mut terminal = setup_terminal()?;
         let mut events = EventHandler::new(Duration::from_millis(250));
+
+        // Initialize table selection
+        if !self.state.current_items().is_empty() {
+            self.table_state.select(Some(0));
+        }
 
         loop {
             terminal.draw(|f| {
@@ -49,12 +71,7 @@ impl App {
             if let Some(event) = events.next().await {
                 match event {
                     AppEvent::Key(key_event) => {
-                        if let crossterm::event::KeyCode::Char('q') = key_event.code {
-                            self.should_quit = true;
-                        }
-                        if let crossterm::event::KeyCode::Esc = key_event.code {
-                            self.should_quit = true;
-                        }
+                        self.handle_key_event(key_event);
                     }
                     AppEvent::Tick => {
                         // Handle tick events if needed
