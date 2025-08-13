@@ -115,6 +115,9 @@ impl App {
             KeyCode::Char('x') => {
                 self.show_delete_confirmation = true;
             }
+            KeyCode::Char('r') => {
+                self.toggle_reference_status();
+            }
             KeyCode::Tab => {
                 match self.state.current_view {
                     View::Inbox => self.state.current_view = View::Archive,
@@ -131,6 +134,20 @@ impl App {
                 }
             }
             _ => {}
+        }
+    }
+
+    fn toggle_reference_status(&mut self) {
+        if self.state.current_view != View::Archive {
+            return;
+        }
+
+        if let Some(item) = self.state.selected_item_mut() {
+            match item.kind {
+                folio_core::Kind::Normal => item.kind = folio_core::Kind::Reference,
+                folio_core::Kind::Reference => item.kind = folio_core::Kind::Normal,
+            }
+            let _ = self.save_data();
         }
     }
 
@@ -255,9 +272,7 @@ impl App {
                     AppEvent::Key(key_event) => {
                         self.handle_key_event(key_event);
                     }
-                    AppEvent::Tick => {
-                        // Handle tick events if needed
-                    }
+                    AppEvent::Tick => {}
                 }
             }
 
