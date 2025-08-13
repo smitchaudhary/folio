@@ -1,3 +1,4 @@
+use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use strum::EnumString;
 
@@ -38,4 +39,21 @@ pub enum Kind {
     #[serde(rename = "reference")]
     #[strum(serialize = "reference")]
     Reference,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Item {
+    pub name: String,
+    #[serde(rename = "type")]
+    pub item_type: ItemType,
+    pub status: Status,
+    pub author: String,
+    pub link: String,
+    pub added_at: DateTime<Utc>,
+    pub started_at: Option<DateTime<Utc>>,
+    pub finished_at: Option<DateTime<Utc>>,
+    pub note: String,
+    pub kind: Kind,
+    #[serde(rename = "_v")]
+    pub version: u8,
 }
