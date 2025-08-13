@@ -44,6 +44,9 @@ impl App {
                 self.state.previous_item();
                 self.table_state.select(Some(self.state.selected_index));
             }
+            KeyCode::Char('s') => {
+                self.state.cycle_selected_item_status();
+            }
             _ => {}
         }
     }
@@ -54,7 +57,6 @@ impl App {
         let mut terminal = setup_terminal()?;
         let mut events = EventHandler::new(Duration::from_millis(250));
 
-        // Initialize table selection
         if !self.state.current_items().is_empty() {
             self.table_state.select(Some(0));
         }
