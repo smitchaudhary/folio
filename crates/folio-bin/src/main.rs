@@ -37,6 +37,9 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
                 Commands::List { status, r#type } => {
                     handle_list_command(status.as_deref(), r#type.as_deref())?;
                 }
+                Commands::SetStatus { id, status } => {
+                    handle_set_status_command(*id, status)?;
+                }
                 Commands::Config { subcommand } => {
                     handle_config_command(subcommand)?;
                 }
@@ -104,7 +107,6 @@ fn handle_list_command(
         println!("No items found.");
         return Ok(());
     }
-
     println!(
         "{:<4} {:<6} {:<30} {:<10} {:<20} {:<15}",
         "ID", "Status", "Name", "Type", "Added", "Author"
@@ -149,6 +151,67 @@ fn handle_list_command(
             author_display
         );
     }
+    Ok(())
+}
+
+fn handle_set_status_command(
+    id: usize,
+    status_str: &str,
+) -> Result<(), Box<dyn std::error::Error>> {
+    let inbox_path = get_inbox_path()?;
+    let archive_path = get_archive_path()?;
+
+    let mut inbox_items = load_items_from_file(&inbox_path)?;
+    let mut archive_items = load_items_from_file(&archive_path)?;
+
+    let mut item_found = false;
+
+    if id > 0 && id <= inbox_items.len() {
+        let item_index = id - 1;
+        let item = &mut inbox_items[item_index];
+
+        let new_status =
+            Status::from_str(status_str).map_err(|_| format!("Invalid status: {}", status_str))?;
+
+        let item_status_changed_to_done = item.status != Status::Done && new_status == Status::Done;
+
+        item.status = new_status;
+
+        folio_core::update_timestamps(item);
+
+        item_found = true;
+
+        if item_status_changed_to_done {
+            let done_item = inbox_items.remove(item_index);
+            archive_items.push(done_item);
+            println!(
+                "Item #{} status updated to '{}' and moved to archive",
+                id, status_str
+            );
+        } else {
+            println!("Item #{} status updated to '{}'", id, status_str);
+        }
+    } else if id > inbox_items.len() && id <= inbox_items.len() + archive_items.len() {
+        let item_index = id - inbox_items.len() - 1;
+        let item = &mut archive_items[item_index];
+
+        let new_status =
+            Status::from_str(status_str).map_err(|_| format!("Invalid status: {}", status_str))?;
+
+        item.status = new_status;
+
+        folio_core::update_timestamps(item);
+
+        item_found = true;
+        println!("Item #{} status updated to '{}'", id, status_str);
+    }
+
+    if !item_found {
+        return Err(format!("Item with ID {} not found", id).into());
+    }
+
+    save_inbox(&inbox_items)?;
+    folio_storage::save_archive(&archive_items)?;
 
     Ok(())
 }
