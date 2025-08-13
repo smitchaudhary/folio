@@ -22,42 +22,39 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
     let cli = Cli::parse();
 
     match &cli.command {
-        Some(command) => {
-            match command {
-                Commands::Add {
-                    name,
-                    r#type,
-                    author,
-                    link,
-                    note,
-                    kind,
-                } => {
-                    handle_add_command(name, r#type, author, link, note, kind)?;
-                }
-                Commands::List { status, r#type } => {
-                    handle_list_command(status.as_deref(), r#type.as_deref())?;
-                }
-                Commands::SetStatus { id, status } => {
-                    handle_set_status_command(*id, status)?;
-                }
-                Commands::Edit { id } => {
-                    handle_edit_command(*id)?;
-                }
-                Commands::Archive { id } => {
-                    handle_archive_command(*id)?;
-                }
-                Commands::Delete { id } => {
-                    handle_delete_command(*id)?;
-                }
-                Commands::Config { subcommand } => {
-                    handle_config_command(subcommand)?;
-                }
-                _ => {
-                    // For now, just print the command to verify it's working
-                    println!("Command: {:?}", command);
-                }
+        Some(command) => match command {
+            Commands::Add {
+                name,
+                r#type,
+                author,
+                link,
+                note,
+                kind,
+            } => {
+                handle_add_command(name, r#type, author, link, note, kind)?;
             }
-        }
+            Commands::List { status, r#type } => {
+                handle_list_command(status.as_deref(), r#type.as_deref())?;
+            }
+            Commands::SetStatus { id, status } => {
+                handle_set_status_command(*id, status)?;
+            }
+            Commands::Edit { id } => {
+                handle_edit_command(*id)?;
+            }
+            Commands::Archive { id } => {
+                handle_archive_command(*id)?;
+            }
+            Commands::Delete { id } => {
+                handle_delete_command(*id)?;
+            }
+            Commands::MarkRef { id } => {
+                handle_mark_ref_command(*id)?;
+            }
+            Commands::Config { subcommand } => {
+                handle_config_command(subcommand)?;
+            }
+        },
         None => {
             // Default behavior when no subcommand is provided
             println!("Running default TUI mode");
@@ -369,6 +366,57 @@ fn handle_delete_command(id: usize) -> Result<(), Box<dyn std::error::Error>> {
     }
 
     println!("Item #{} deleted successfully", id);
+    Ok(())
+}
+
+fn handle_mark_ref_command(id: usize) -> Result<(), Box<dyn std::error::Error>> {
+    let inbox_path = get_inbox_path()?;
+    let archive_path = get_archive_path()?;
+    let mut inbox_items = load_items_from_file(&inbox_path)?;
+    let mut archive_items = load_items_from_file(&archive_path)?;
+
+    let (is_in_inbox, item_index) = if id > 0 && id <= inbox_items.len() {
+        let item_index = id - 1;
+        (true, item_index)
+    } else if id > inbox_items.len() && id <= inbox_items.len() + archive_items.len() {
+        let item_index = id - inbox_items.len() - 1;
+        (false, item_index)
+    } else {
+        return Err(format!("Item with ID {} not found", id).into());
+    };
+
+    if is_in_inbox {
+        let item = &mut inbox_items[item_index];
+        match item.kind {
+            folio_core::Kind::Normal => {
+                item.kind = folio_core::Kind::Reference;
+                let ref_item = inbox_items.remove(item_index);
+                append_to_archive(&ref_item)?;
+                save_inbox(&inbox_items)?;
+                println!("Item #{} marked as reference and moved to archive", id);
+            }
+            folio_core::Kind::Reference => {
+                item.kind = folio_core::Kind::Normal;
+                save_inbox(&inbox_items)?;
+                println!("Item #{} unmarked as reference", id);
+            }
+        }
+    } else {
+        let item = &mut archive_items[item_index];
+        match item.kind {
+            folio_core::Kind::Normal => {
+                item.kind = folio_core::Kind::Reference;
+                folio_storage::save_archive(&archive_items)?;
+                println!("Item #{} marked as reference", id);
+            }
+            folio_core::Kind::Reference => {
+                item.kind = folio_core::Kind::Normal;
+                folio_storage::save_archive(&archive_items)?;
+                println!("Item #{} unmarked as reference", id);
+            }
+        }
+    }
+
     Ok(())
 }
 
