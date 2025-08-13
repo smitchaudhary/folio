@@ -50,3 +50,15 @@ pub fn load_items_from_file<P: AsRef<Path>>(
         Err(_) => Ok(vec![]),
     }
 }
+
+pub fn serialize_items_to_jsonl(items: &[Item]) -> Result<String, serde_json::Error> {
+    let mut jsonl = String::new();
+
+    for item in items {
+        let line = serde_json::to_string(item)?;
+        jsonl.push_str(&line);
+        jsonl.push('\n');
+    }
+
+    Ok(jsonl)
+}
