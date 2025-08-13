@@ -4,7 +4,7 @@ use crate::data::{
 };
 use crate::event::{AppEvent, EventHandler};
 use crate::forms::AddItemForm;
-use crate::state::AppState;
+use crate::state::{AppState, View};
 use crate::terminal::{restore_terminal, setup_terminal};
 use crate::widgets::ItemsTable;
 use chrono::Utc;
@@ -96,6 +96,14 @@ impl App {
             }
             KeyCode::Char('a') => {
                 self.add_form.toggle_visibility();
+            }
+            KeyCode::Tab => {
+                match self.state.current_view {
+                    View::Inbox => self.state.current_view = View::Archive,
+                    View::Archive => self.state.current_view = View::Inbox,
+                }
+                self.state.selected_index = 0;
+                self.table_state.select(Some(0));
             }
             KeyCode::Enter => {
                 if let Some(item) = self.state.selected_item() {
