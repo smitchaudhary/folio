@@ -46,6 +46,9 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
                 Commands::Archive { id } => {
                     handle_archive_command(*id)?;
                 }
+                Commands::Delete { id } => {
+                    handle_delete_command(*id)?;
+                }
                 Commands::Config { subcommand } => {
                     handle_config_command(subcommand)?;
                 }
@@ -317,6 +320,56 @@ fn handle_archive_command(id: usize) -> Result<(), Box<dyn std::error::Error>> {
     } else {
         Err(format!("Item with ID {} not found", id).into())
     }
+}
+
+fn handle_delete_command(id: usize) -> Result<(), Box<dyn std::error::Error>> {
+    let inbox_path = get_inbox_path()?;
+    let archive_path = get_archive_path()?;
+    let mut inbox_items = load_items_from_file(&inbox_path)?;
+    let mut archive_items = load_items_from_file(&archive_path)?;
+
+    let (is_in_inbox, item_index, item) = if id > 0 && id <= inbox_items.len() {
+        let item_index = id - 1;
+        let item = inbox_items[item_index].clone();
+        (true, item_index, item)
+    } else if id > inbox_items.len() && id <= inbox_items.len() + archive_items.len() {
+        let item_index = id - inbox_items.len() - 1;
+        let item = archive_items[item_index].clone();
+        (false, item_index, item)
+    } else {
+        return Err(format!("Item with ID {} not found", id).into());
+    };
+
+    println!("Item to delete:");
+    println!("  Name: {}", item.name);
+    println!("  Type: {:?}", item.item_type);
+    println!("  Status: {:?}", item.status);
+    println!("  Author: {}", item.author);
+    println!("  Link: {}", item.link);
+
+    print!("Delete this item permanently? (y/N): ");
+    use std::io::{Write, stdin, stdout};
+    stdout().flush()?;
+
+    let mut input = String::new();
+    stdin().read_line(&mut input)?;
+    let confirmation = input.trim().to_lowercase();
+
+    if confirmation != "y" && confirmation != "yes" {
+        println!("Delete operation cancelled");
+        return Ok(());
+    }
+
+    if is_in_inbox {
+        inbox_items.remove(item_index);
+        save_inbox(&inbox_items)?;
+    } else {
+        archive_items.remove(item_index);
+        folio_storage::save_archive(&archive_items)?;
+    }
+
+    println!("Item #{} deleted successfully", id);
+    Ok(())
 }
 
 fn prompt_for_input(field_name: &str) -> Result<String, Box<dyn std::error::Error>> {
