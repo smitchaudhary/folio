@@ -439,6 +439,23 @@ fn handle_add_command(
     note: &Option<String>,
     kind: &Option<String>,
 ) -> Result<(), Box<dyn std::error::Error>> {
+    if name.is_none() {
+        let tui_path = std::env::current_exe()?;
+        let tui_dir = tui_path
+            .parent()
+            .ok_or("Could not determine TUI directory")?;
+        let tui_binary = tui_dir.join("folio-tui");
+
+        let output = std::process::Command::new(tui_binary)
+            .arg("--add")
+            .status()?;
+
+        if !output.success() {
+            return Err("Failed to launch TUI".into());
+        }
+        return Ok(());
+    }
+
     let config = load_config()?;
 
     let inbox_path = get_inbox_path()?;

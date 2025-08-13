@@ -23,6 +23,7 @@ pub struct App {
     pub status_message: Option<(String, Instant)>,
     pub filter_input_mode: bool,
     pub filter_input: String,
+    pub start_with_add_form: bool,
 }
 
 impl App {
@@ -38,7 +39,14 @@ impl App {
             status_message: None,
             filter_input_mode: false,
             filter_input: String::new(),
+            start_with_add_form: false,
         }
+    }
+
+    pub fn new_with_add_form() -> Self {
+        let mut app = Self::new();
+        app.start_with_add_form = true;
+        app
     }
 
     pub async fn load_data(&mut self) -> Result<(), Box<dyn std::error::Error>> {
@@ -408,6 +416,10 @@ impl App {
 
         if !self.state.current_items().is_empty() {
             self.table_state.select(Some(0));
+        }
+
+        if self.start_with_add_form {
+            self.add_form.toggle_visibility();
         }
 
         loop {
