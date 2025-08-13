@@ -97,3 +97,11 @@ pub fn get_config_path() -> Result<PathBuf, Box<dyn std::error::Error>> {
     let config_path = get_folio_dir()?.join("config.json");
     Ok(config_path)
 }
+
+pub fn save_inbox(items: &[Item]) -> Result<(), Box<dyn std::error::Error>> {
+    ensure_folio_dir()?;
+    let inbox_path = get_inbox_path()?;
+    let jsonl = serialize_items_to_jsonl(items)?;
+    fs_atomic::atomic_write(inbox_path, jsonl.as_bytes())?;
+    Ok(())
+}
