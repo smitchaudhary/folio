@@ -728,9 +728,9 @@ impl App {
         let area = frame.size();
         let popup_area = ratatui::layout::Rect {
             x: area.width / 2 - 30,
-            y: area.height / 2 - 10,
+            y: area.height / 2 - 12,
             width: 60.min(area.width),
-            height: 20.min(area.height),
+            height: 24.min(area.height),
         };
 
         frame.render_widget(ratatui::widgets::Clear, popup_area);
@@ -759,6 +759,7 @@ impl App {
             ratatui::text::Line::from(""),
             ratatui::text::Line::from("General:"),
             ratatui::text::Line::from("  ?        Show this help"),
+            ratatui::text::Line::from("  /        Filter items"),
             ratatui::text::Line::from("  q/Esc    Quit"),
         ];
 
