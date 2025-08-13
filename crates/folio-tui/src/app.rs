@@ -894,9 +894,9 @@ impl App {
         };
 
         let status_text = if message_text.is_empty() {
-            format!("View: {}", view_text)
+            format!("View: {} | Press ? for help", view_text)
         } else {
-            format!("{} | View: {}", message_text, view_text)
+            format!("{} | View: {} | Press ? for help", message_text, view_text)
         };
 
         let paragraph = ratatui::widgets::Paragraph::new(status_text)
