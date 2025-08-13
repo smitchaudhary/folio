@@ -35,9 +35,9 @@ impl App {
         Ok(())
     }
 
-    async fn save_data(&self) -> Result<(), Box<dyn std::error::Error>> {
-        save_inbox_items(&self.state.inbox_items).await?;
-        save_archive_items(&self.state.archive_items).await?;
+    pub async fn save_data(&self) -> Result<(), Box<dyn std::error::Error>> {
+        save_inbox_items(self.state.get_inbox_items()).await?;
+        save_archive_items(self.state.get_archive_items()).await?;
         Ok(())
     }
 
@@ -56,14 +56,20 @@ impl App {
             KeyCode::Char('s') => {
                 if let Some(done_item) = self.state.cycle_selected_item_status() {
                     let _ = append_item_to_archive(&done_item);
+                } else {
+                    let _ = self.save_data();
                 }
             }
             KeyCode::Char('i') => {
-                self.state.move_selected_to_doing();
+                if self.state.move_selected_to_doing() {
+                    let _ = self.save_data();
+                }
             }
             KeyCode::Char('d') => {
                 if let Some(done_item) = self.state.move_selected_to_done() {
                     let _ = append_item_to_archive(&done_item);
+                } else {
+                    let _ = self.save_data();
                 }
             }
             KeyCode::Enter => {

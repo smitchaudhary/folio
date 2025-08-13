@@ -1,16 +1,16 @@
 use folio_core::{Item, Status};
 
+#[derive(PartialEq)]
+pub enum View {
+    Inbox,
+    Archive,
+}
+
 pub struct AppState {
     pub inbox_items: Vec<Item>,
     pub archive_items: Vec<Item>,
     pub selected_index: usize,
     pub current_view: View,
-}
-
-#[derive(PartialEq)]
-pub enum View {
-    Inbox,
-    Archive,
 }
 
 impl AppState {
@@ -148,5 +148,13 @@ impl AppState {
 
     pub fn add_item_to_archive(&mut self, item: Item) {
         self.archive_items.push(item);
+    }
+
+    pub fn get_inbox_items(&self) -> &[Item] {
+        &self.inbox_items
+    }
+
+    pub fn get_archive_items(&self) -> &[Item] {
+        &self.archive_items
     }
 }

@@ -3,6 +3,10 @@ name = "folio-tui"
 version = "0.1.0"
 edition = "2024"
 
+[[bin]]
+name = "folio-tui"
+path = "src/main.rs"
+
 [dependencies]
 crossterm = { version = "0.27", features = ["event-stream"] }
 folio-core = { path = "../folio-core" }
