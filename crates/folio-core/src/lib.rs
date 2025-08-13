@@ -3,7 +3,7 @@ use serde::{Deserialize, Serialize};
 use strum::EnumString;
 
 mod error;
-pub use error::{CoreError, CapError};
+pub use error::{CapError, CoreError};
 
 mod config;
 pub use config::{Config, OverflowStrategy};
@@ -15,7 +15,6 @@ mod cap;
 pub use cap::add_with_cap;
 
 mod archive;
-pub use archive::{should_auto_archive, move_to_archive};
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, EnumString)]
 pub enum ItemType {

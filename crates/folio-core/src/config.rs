@@ -9,9 +9,6 @@ pub struct Config {
     /// Strategy to use when the inbox is full
     pub archive_on_overflow: OverflowStrategy,
 
-    /// Automatically archive done items after this many days (0 = disabled)
-    pub auto_archive_done_days: u32,
-
     /// Schema version for migration purposes
     #[serde(rename = "_v")]
     pub version: u8,
@@ -36,7 +33,6 @@ impl Config {
         Self {
             max_items: 100,
             archive_on_overflow: OverflowStrategy::Abort,
-            auto_archive_done_days: 0,
             version: 1,
         }
     }

@@ -507,7 +507,6 @@ fn handle_config_command(subcommand: &ConfigSubcommands) -> Result<(), Box<dyn s
             match key.as_str() {
                 "max_items" => println!("{}", config_value["max_items"]),
                 "archive_on_overflow" => println!("{}", config_value["archive_on_overflow"]),
-                "auto_archive_done_days" => println!("{}", config_value["auto_archive_done_days"]),
                 "version" | "_v" => println!("{}", config_value["_v"]),
                 _ => {
                     eprintln!("Unknown config key: {}", key);
@@ -523,13 +522,6 @@ fn handle_config_command(subcommand: &ConfigSubcommands) -> Result<(), Box<dyn s
                     Ok(val) => config.max_items = val,
                     Err(_) => {
                         eprintln!("Invalid value for max_items: {}", value);
-                        process::exit(1);
-                    }
-                },
-                "auto_archive_done_days" => match value.parse::<u32>() {
-                    Ok(val) => config.auto_archive_done_days = val,
-                    Err(_) => {
-                        eprintln!("Invalid value for auto_archive_done_days: {}", value);
                         process::exit(1);
                     }
                 },
