@@ -18,6 +18,7 @@ pub struct App {
     pub table_state: TableState,
     pub add_form: AddItemForm,
     pub show_delete_confirmation: bool,
+    pub show_help: bool,
 }
 
 impl App {
@@ -28,6 +29,7 @@ impl App {
             table_state: TableState::default(),
             add_form: AddItemForm::new(),
             show_delete_confirmation: false,
+            show_help: false,
         }
     }
 
@@ -48,6 +50,13 @@ impl App {
     }
 
     fn handle_key_event(&mut self, key_event: KeyEvent) {
+        if self.show_help {
+            if let KeyCode::Char('?') | KeyCode::Esc = key_event.code {
+                self.show_help = false;
+            }
+            return;
+        }
+
         if self.show_delete_confirmation {
             match key_event.code {
                 KeyCode::Char('y') | KeyCode::Char('Y') => {
@@ -117,6 +126,9 @@ impl App {
             }
             KeyCode::Char('r') => {
                 self.toggle_reference_status();
+            }
+            KeyCode::Char('?') => {
+                self.show_help = true;
             }
             KeyCode::Tab => {
                 match self.state.current_view {
@@ -265,6 +277,10 @@ impl App {
                 if self.show_delete_confirmation {
                     Self::render_delete_confirmation(f);
                 }
+
+                if self.show_help {
+                    Self::render_help_dialog(f);
+                }
             })?;
 
             if let Some(event) = events.next().await {
@@ -308,6 +324,47 @@ impl App {
         let paragraph = ratatui::widgets::Paragraph::new(text)
             .block(block)
             .alignment(ratatui::layout::Alignment::Center);
+
+        frame.render_widget(paragraph, popup_area);
+    }
+
+    fn render_help_dialog(frame: &mut ratatui::Frame) {
+        let area = frame.size();
+        let popup_area = ratatui::layout::Rect {
+            x: area.width / 2 - 30,
+            y: area.height / 2 - 10,
+            width: 60.min(area.width),
+            height: 20.min(area.height),
+        };
+
+        frame.render_widget(ratatui::widgets::Clear, popup_area);
+
+        let block = ratatui::widgets::Block::default()
+            .title("Help")
+            .borders(ratatui::widgets::Borders::ALL);
+
+        let help_text = vec![
+            ratatui::text::Line::from("Navigation:"),
+            ratatui::text::Line::from("  ↑/↓      Move selection"),
+            ratatui::text::Line::from("  Tab      Switch between Inbox/Archive"),
+            ratatui::text::Line::from(""),
+            ratatui::text::Line::from("Item Actions:"),
+            ratatui::text::Line::from("  Enter    Open link"),
+            ratatui::text::Line::from("  s        Cycle status"),
+            ratatui::text::Line::from("  i        Set status to doing"),
+            ratatui::text::Line::from("  d        Set status to done"),
+            ratatui::text::Line::from("  a        Add new item"),
+            ratatui::text::Line::from("  x        Delete item"),
+            ratatui::text::Line::from("  r        Toggle reference (Archive only)"),
+            ratatui::text::Line::from(""),
+            ratatui::text::Line::from("General:"),
+            ratatui::text::Line::from("  ?        Show this help"),
+            ratatui::text::Line::from("  q/Esc    Quit"),
+        ];
+
+        let paragraph = ratatui::widgets::Paragraph::new(help_text)
+            .block(block)
+            .alignment(ratatui::layout::Alignment::Left);
 
         frame.render_widget(paragraph, popup_area);
     }
