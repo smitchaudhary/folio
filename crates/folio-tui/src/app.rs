@@ -17,6 +17,7 @@ pub struct App {
     pub state: AppState,
     pub table_state: TableState,
     pub add_form: AddItemForm,
+    pub show_delete_confirmation: bool,
 }
 
 impl App {
@@ -26,6 +27,7 @@ impl App {
             state: AppState::new(),
             table_state: TableState::default(),
             add_form: AddItemForm::new(),
+            show_delete_confirmation: false,
         }
     }
 
@@ -46,7 +48,20 @@ impl App {
     }
 
     fn handle_key_event(&mut self, key_event: KeyEvent) {
-        // If the add form is visible, handle form-specific keys
+        if self.show_delete_confirmation {
+            match key_event.code {
+                KeyCode::Char('y') | KeyCode::Char('Y') => {
+                    self.delete_selected_item();
+                    self.show_delete_confirmation = false;
+                }
+                KeyCode::Char('n') | KeyCode::Char('N') | KeyCode::Esc => {
+                    self.show_delete_confirmation = false;
+                }
+                _ => {}
+            }
+            return;
+        }
+
         if self.add_form.is_visible {
             match key_event.code {
                 KeyCode::Esc => {
@@ -97,6 +112,9 @@ impl App {
             KeyCode::Char('a') => {
                 self.add_form.toggle_visibility();
             }
+            KeyCode::Char('x') => {
+                self.show_delete_confirmation = true;
+            }
             KeyCode::Tab => {
                 match self.state.current_view {
                     View::Inbox => self.state.current_view = View::Archive,
@@ -113,6 +131,37 @@ impl App {
                 }
             }
             _ => {}
+        }
+    }
+
+    fn delete_selected_item(&mut self) {
+        match self.state.current_view {
+            View::Inbox => {
+                if !self.state.inbox_items.is_empty()
+                    && self.state.selected_index < self.state.inbox_items.len()
+                {
+                    self.state.inbox_items.remove(self.state.selected_index);
+                    if self.state.selected_index >= self.state.inbox_items.len()
+                        && !self.state.inbox_items.is_empty()
+                    {
+                        self.state.selected_index = self.state.inbox_items.len() - 1;
+                    }
+                    let _ = self.save_data();
+                }
+            }
+            View::Archive => {
+                if !self.state.archive_items.is_empty()
+                    && self.state.selected_index < self.state.archive_items.len()
+                {
+                    self.state.archive_items.remove(self.state.selected_index);
+                    if self.state.selected_index >= self.state.archive_items.len()
+                        && !self.state.archive_items.is_empty()
+                    {
+                        self.state.selected_index = self.state.archive_items.len() - 1;
+                    }
+                    let _ = self.save_data();
+                }
+            }
         }
     }
 
@@ -195,6 +244,10 @@ impl App {
 
                 ItemsTable::render(f, &self.state, chunks[0], &self.table_state);
                 self.add_form.render(f);
+
+                if self.show_delete_confirmation {
+                    Self::render_delete_confirmation(f);
+                }
             })?;
 
             if let Some(event) = events.next().await {
@@ -215,5 +268,32 @@ impl App {
 
         restore_terminal(&mut terminal)?;
         Ok(())
+    }
+
+    fn render_delete_confirmation(frame: &mut ratatui::Frame) {
+        let area = frame.size();
+        let popup_area = ratatui::layout::Rect {
+            x: area.width / 2 - 20,
+            y: area.height / 2 - 2,
+            width: 40.min(area.width),
+            height: 4.min(area.height),
+        };
+
+        frame.render_widget(ratatui::widgets::Clear, popup_area);
+
+        let block = ratatui::widgets::Block::default()
+            .title("Confirm Delete")
+            .borders(ratatui::widgets::Borders::ALL);
+
+        let text = vec![
+            ratatui::text::Line::from("Delete this item permanently?"),
+            ratatui::text::Line::from("(Y)es / (N)o"),
+        ];
+
+        let paragraph = ratatui::widgets::Paragraph::new(text)
+            .block(block)
+            .alignment(ratatui::layout::Alignment::Center);
+
+        frame.render_widget(paragraph, popup_area);
     }
 }
