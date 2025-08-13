@@ -196,6 +196,7 @@ dependencies = [
  "clap",
  "folio-core",
  "folio-storage",
+ "serde_json",
 ]
 
 [[package]]

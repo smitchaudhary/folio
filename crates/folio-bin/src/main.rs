@@ -1,11 +1,13 @@
 use chrono::Utc;
 use clap::Parser;
-use folio_bin::cli::{Cli, Commands};
+use folio_bin::cli::{Cli, Commands, ConfigSubcommands};
 use folio_core::add_with_cap;
-use folio_core::{Item, ItemType, Kind, Status};
+use folio_core::{Item, ItemType, Kind, OverflowStrategy, Status};
 use folio_storage::{
-    append_to_archive, get_inbox_path, load_config, load_items_from_file, save_inbox,
+    append_to_archive, get_inbox_path, load_config, load_items_from_file, save_config, save_inbox,
 };
+use serde_json;
+use std::process;
 use std::str::FromStr;
 
 fn main() {
@@ -30,6 +32,9 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
                     kind,
                 } => {
                     handle_add_command(name, r#type, author, link, note, kind)?;
+                }
+                Commands::Config { subcommand } => {
+                    handle_config_command(subcommand)?;
                 }
                 _ => {
                     // For now, just print the command to verify it's working
@@ -105,5 +110,77 @@ fn handle_add_command(
     }
 
     println!("Item added successfully");
+    Ok(())
+}
+
+fn handle_config_command(subcommand: &ConfigSubcommands) -> Result<(), Box<dyn std::error::Error>> {
+    match subcommand {
+        ConfigSubcommands::List => {
+            let config = load_config()?;
+            let json = serde_json::to_string_pretty(&config)?;
+            println!("{}", json);
+        }
+        ConfigSubcommands::Get { key } => {
+            let config = load_config()?;
+            let config_value = serde_json::to_value(&config)?;
+
+            match key.as_str() {
+                "max_items" => println!("{}", config_value["max_items"]),
+                "archive_on_overflow" => println!("{}", config_value["archive_on_overflow"]),
+                "auto_archive_done_days" => println!("{}", config_value["auto_archive_done_days"]),
+                "version" | "_v" => println!("{}", config_value["_v"]),
+                _ => {
+                    eprintln!("Unknown config key: {}", key);
+                    process::exit(1);
+                }
+            }
+        }
+        ConfigSubcommands::Set { key, value } => {
+            let mut config = load_config()?;
+
+            match key.as_str() {
+                "max_items" => match value.parse::<u32>() {
+                    Ok(val) => config.max_items = val,
+                    Err(_) => {
+                        eprintln!("Invalid value for max_items: {}", value);
+                        process::exit(1);
+                    }
+                },
+                "auto_archive_done_days" => match value.parse::<u32>() {
+                    Ok(val) => config.auto_archive_done_days = val,
+                    Err(_) => {
+                        eprintln!("Invalid value for auto_archive_done_days: {}", value);
+                        process::exit(1);
+                    }
+                },
+                "archive_on_overflow" => match value.as_str() {
+                    "abort" => config.archive_on_overflow = OverflowStrategy::Abort,
+                    "todo" => config.archive_on_overflow = OverflowStrategy::Todo,
+                    "done" => config.archive_on_overflow = OverflowStrategy::Done,
+                    "any" => config.archive_on_overflow = OverflowStrategy::Any,
+                    _ => {
+                        eprintln!(
+                            "Invalid value for archive_on_overflow: {}. Must be one of: abort, todo, done, any",
+                            value
+                        );
+                        process::exit(1);
+                    }
+                },
+                _ => {
+                    eprintln!("Unknown config key: {}", key);
+                    process::exit(1);
+                }
+            }
+
+            save_config(&config)?;
+            println!("Config updated successfully");
+        }
+        ConfigSubcommands::Reset => {
+            let config = folio_core::Config::default();
+            save_config(&config)?;
+            println!("Config reset to default values");
+        }
+    }
+
     Ok(())
 }
