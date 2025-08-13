@@ -1,6 +1,8 @@
 use folio_core::Item;
 use serde_json;
+use std::fs::File;
 use std::io::{BufRead, BufReader, Read};
+use std::path::Path;
 
 pub fn deserialize_jsonl_from_string(jsonl_str: &str) -> Result<Vec<Item>, serde_json::Error> {
     let mut items = Vec::new();
@@ -35,4 +37,16 @@ pub fn deserialize_jsonl_from_reader<R: Read>(
     }
 
     Ok(items)
+}
+
+pub fn load_items_from_file<P: AsRef<Path>>(
+    path: P,
+) -> Result<Vec<Item>, Box<dyn std::error::Error>> {
+    match File::open(path) {
+        Ok(file) => {
+            let items = deserialize_jsonl_from_reader(file)?;
+            Ok(items)
+        }
+        Err(_) => Ok(vec![]),
+    }
 }
