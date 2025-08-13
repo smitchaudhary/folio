@@ -98,10 +98,18 @@ pub fn get_config_path() -> Result<PathBuf, Box<dyn std::error::Error>> {
     Ok(config_path)
 }
 
+fn save_items(items: &[Item], path: PathBuf) -> Result<(), Box<dyn std::error::Error>> {
+    let jsonl = serialize_items_to_jsonl(items)?;
+    fs_atomic::atomic_write(path, jsonl.as_bytes())?;
+    Ok(())
+}
+
 pub fn save_inbox(items: &[Item]) -> Result<(), Box<dyn std::error::Error>> {
     ensure_folio_dir()?;
-    let inbox_path = get_inbox_path()?;
-    let jsonl = serialize_items_to_jsonl(items)?;
-    fs_atomic::atomic_write(inbox_path, jsonl.as_bytes())?;
-    Ok(())
+    save_items(items, get_inbox_path()?)
+}
+
+pub fn save_archive(items: &[Item]) -> Result<(), Box<dyn std::error::Error>> {
+    ensure_folio_dir()?;
+    save_items(items, get_archive_path()?)
 }
