@@ -1,4 +1,4 @@
-use folio_core::Item;
+use folio_core::{Item, Config};
 use serde_json;
 use std::fs::{self, File, OpenOptions};
 use std::io::{BufRead, BufReader, Read, Write};
@@ -126,4 +126,17 @@ pub fn append_to_archive(item: &Item) -> Result<(), Box<dyn std::error::Error>> 
         
     writeln!(file, "{}", json_line)?;
     Ok(())
+}
+
+pub fn load_config() -> Result<Config, Box<dyn std::error::Error>> {
+    let config_path = get_config_path()?;
+    
+    if config_path.exists() {
+        let file = File::open(config_path)?;
+        let config: Config = serde_json::from_reader(file)?;
+        Ok(config)
+    } else {
+        // Return default config if file doesn't exist
+        Ok(Config::default())
+    }
 }
