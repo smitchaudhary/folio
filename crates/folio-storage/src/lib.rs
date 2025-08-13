@@ -1,7 +1,7 @@
 use folio_core::Item;
 use serde_json;
-use std::fs::{self, File};
-use std::io::{BufRead, BufReader, Read};
+use std::fs::{self, File, OpenOptions};
+use std::io::{BufRead, BufReader, Read, Write};
 use std::path::{Path, PathBuf};
 
 pub mod fs_atomic;
@@ -112,4 +112,18 @@ pub fn save_inbox(items: &[Item]) -> Result<(), Box<dyn std::error::Error>> {
 pub fn save_archive(items: &[Item]) -> Result<(), Box<dyn std::error::Error>> {
     ensure_folio_dir()?;
     save_items(items, get_archive_path()?)
+}
+
+pub fn append_to_archive(item: &Item) -> Result<(), Box<dyn std::error::Error>> {
+    ensure_folio_dir()?;
+    let archive_path = get_archive_path()?;
+    let json_line = serde_json::to_string(item)?;
+    
+    let mut file = OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(archive_path)?;
+        
+    writeln!(file, "{}", json_line)?;
+    Ok(())
 }
