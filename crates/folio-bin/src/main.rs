@@ -43,6 +43,9 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
                 Commands::Edit { id } => {
                     handle_edit_command(*id)?;
                 }
+                Commands::Archive { id } => {
+                    handle_archive_command(*id)?;
+                }
                 Commands::Config { subcommand } => {
                     handle_config_command(subcommand)?;
                 }
@@ -290,6 +293,30 @@ fn handle_edit_command(id: usize) -> Result<(), Box<dyn std::error::Error>> {
 
     println!("Item #{} updated successfully", id);
     Ok(())
+}
+
+fn handle_archive_command(id: usize) -> Result<(), Box<dyn std::error::Error>> {
+    let inbox_path = get_inbox_path()?;
+    let archive_path = get_archive_path()?;
+    let mut inbox_items = load_items_from_file(&inbox_path)?;
+    let archive_items = load_items_from_file(&archive_path)?;
+
+    if id > 0 && id <= inbox_items.len() {
+        let item_index = id - 1;
+        let item = inbox_items.remove(item_index);
+
+        append_to_archive(&item)?;
+
+        save_inbox(&inbox_items)?;
+
+        println!("Item #{} archived successfully", id);
+        Ok(())
+    } else if id > inbox_items.len() && id <= inbox_items.len() + archive_items.len() {
+        println!("Item #{} is already in archive", id);
+        Ok(())
+    } else {
+        Err(format!("Item with ID {} not found", id).into())
+    }
 }
 
 fn prompt_for_input(field_name: &str) -> Result<String, Box<dyn std::error::Error>> {
