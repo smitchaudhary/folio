@@ -5,6 +5,9 @@ use strum::EnumString;
 mod error;
 pub use error::CoreError;
 
+mod config;
+pub use config::{Config, OverflowStrategy};
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, EnumString)]
 pub enum ItemType {
     #[serde(rename = "article")]
