@@ -1,4 +1,7 @@
-use crate::data::{load_archive_items, load_inbox_items};
+use crate::data::{
+    append_item_to_archive, load_archive_items, load_inbox_items, save_archive_items,
+    save_inbox_items,
+};
 use crate::event::{AppEvent, EventHandler};
 use crate::state::AppState;
 use crate::terminal::{restore_terminal, setup_terminal};
@@ -32,6 +35,12 @@ impl App {
         Ok(())
     }
 
+    async fn save_data(&self) -> Result<(), Box<dyn std::error::Error>> {
+        save_inbox_items(&self.state.inbox_items).await?;
+        save_archive_items(&self.state.archive_items).await?;
+        Ok(())
+    }
+
     fn handle_key_event(&mut self, key_event: KeyEvent) {
         match key_event.code {
             KeyCode::Char('q') => self.should_quit = true,
@@ -45,13 +54,17 @@ impl App {
                 self.table_state.select(Some(self.state.selected_index));
             }
             KeyCode::Char('s') => {
-                self.state.cycle_selected_item_status();
+                if let Some(done_item) = self.state.cycle_selected_item_status() {
+                    let _ = append_item_to_archive(&done_item);
+                }
             }
             KeyCode::Char('i') => {
                 self.state.move_selected_to_doing();
             }
             KeyCode::Char('d') => {
-                self.state.move_selected_to_done();
+                if let Some(done_item) = self.state.move_selected_to_done() {
+                    let _ = append_item_to_archive(&done_item);
+                }
             }
             KeyCode::Enter => {
                 if let Some(item) = self.state.selected_item() {

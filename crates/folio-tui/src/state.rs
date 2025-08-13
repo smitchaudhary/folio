@@ -7,6 +7,7 @@ pub struct AppState {
     pub current_view: View,
 }
 
+#[derive(PartialEq)]
 pub enum View {
     Inbox,
     Archive,
@@ -71,18 +72,30 @@ impl AppState {
         }
     }
 
-    pub fn cycle_selected_item_status(&mut self) {
+    pub fn cycle_selected_item_status(&mut self) -> Option<Item> {
         if let Some(item) = self.selected_item_mut() {
+            let old_status = item.status.clone();
             folio_core::cycle_status(item);
             folio_core::update_timestamps(item);
+
+            if old_status != Status::Done && item.status == Status::Done {
+                return self.remove_selected_item();
+            }
         }
+        None
     }
 
-    pub fn move_selected_to_done(&mut self) {
+    pub fn move_selected_to_done(&mut self) -> Option<Item> {
         if let Some(item) = self.selected_item_mut() {
+            let old_status = item.status.clone();
             item.status = Status::Done;
             folio_core::update_timestamps(item);
+
+            if old_status != Status::Done {
+                return self.remove_selected_item();
+            }
         }
+        None
     }
 
     pub fn move_selected_to_doing(&mut self) -> bool {
@@ -102,6 +115,24 @@ impl AppState {
         }
     }
 
+    fn remove_selected_item(&mut self) -> Option<Item> {
+        if self.current_view != View::Inbox {
+            return None;
+        }
+
+        if self.inbox_items.is_empty() || self.selected_index >= self.inbox_items.len() {
+            return None;
+        }
+
+        let removed_item = self.inbox_items.remove(self.selected_index);
+
+        if self.selected_index >= self.inbox_items.len() && !self.inbox_items.is_empty() {
+            self.selected_index = self.inbox_items.len() - 1;
+        }
+
+        Some(removed_item)
+    }
+
     pub fn next_item(&mut self) {
         let items_len = self.current_items().len();
         if items_len > 0 {
@@ -113,5 +144,9 @@ impl AppState {
         if self.selected_index > 0 {
             self.selected_index -= 1;
         }
+    }
+
+    pub fn add_item_to_archive(&mut self, item: Item) {
+        self.archive_items.push(item);
     }
 }
