@@ -148,6 +148,28 @@ impl AppState {
         }
     }
 
+    pub fn next_page(&mut self, page_size: usize) {
+        let items_len = self.current_items().len();
+        if items_len > 0 {
+            self.selected_index = (self.selected_index + page_size).min(items_len - 1);
+        }
+    }
+
+    pub fn previous_page(&mut self, page_size: usize) {
+        self.selected_index = self.selected_index.saturating_sub(page_size);
+    }
+
+    pub fn jump_to_first(&mut self) {
+        self.selected_index = 0;
+    }
+
+    pub fn jump_to_last(&mut self) {
+        let items_len = self.current_items().len();
+        if items_len > 0 {
+            self.selected_index = items_len - 1;
+        }
+    }
+
     pub fn add_item_to_archive(&mut self, item: Item) {
         self.archive_items.push(item);
     }

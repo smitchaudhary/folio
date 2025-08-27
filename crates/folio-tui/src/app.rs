@@ -248,6 +248,22 @@ impl App {
                 self.state.previous_item();
                 self.table_state.select(Some(self.state.selected_index));
             }
+            KeyCode::PageDown => {
+                self.state.next_page(10);
+                self.table_state.select(Some(self.state.selected_index));
+            }
+            KeyCode::PageUp => {
+                self.state.previous_page(10);
+                self.table_state.select(Some(self.state.selected_index));
+            }
+            KeyCode::Home => {
+                self.state.jump_to_first();
+                self.table_state.select(Some(self.state.selected_index));
+            }
+            KeyCode::End => {
+                self.state.jump_to_last();
+                self.table_state.select(Some(self.state.selected_index));
+            }
             KeyCode::Char('s') => {
                 if let Some(item) = self.state.selected_item() {
                     let next_status = match item.status {
@@ -749,8 +765,10 @@ impl App {
 
         let help_text = vec![
             ratatui::text::Line::from("Navigation:"),
-            ratatui::text::Line::from("  ↑/↓ or j/k    Move selection"),
-            ratatui::text::Line::from("  Tab            Switch between Inbox/Archive"),
+            ratatui::text::Line::from("  ↑/↓ or j/k        Move selection"),
+            ratatui::text::Line::from("  PgUp/PgDn         Jump pages"),
+            ratatui::text::Line::from("  Home/End          Jump to top/bottom"),
+            ratatui::text::Line::from("  Tab               Switch between Inbox/Archive"),
             ratatui::text::Line::from(""),
             ratatui::text::Line::from("Item Actions:"),
             ratatui::text::Line::from("  Enter    Open link"),
