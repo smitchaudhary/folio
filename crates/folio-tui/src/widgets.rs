@@ -48,9 +48,9 @@ impl ItemsTable {
             match app_state.current_view {
                 View::Inbox => {
                     let status_char = match item.status {
-                        folio_core::Status::Todo => "T",
-                        folio_core::Status::Doing => "▶",
-                        folio_core::Status::Done => "✓",
+                        folio_core::Status::Todo => "📝",
+                        folio_core::Status::Doing => "⏳",
+                        folio_core::Status::Done => "✅",
                     };
 
                     let status_style = match item.status {
@@ -80,8 +80,8 @@ impl ItemsTable {
                 }
                 View::Archive => {
                     let reference_char = match item.kind {
-                        folio_core::Kind::Normal => "✓",
-                        folio_core::Kind::Reference => "☆",
+                        folio_core::Kind::Normal => "✅",
+                        folio_core::Kind::Reference => "🔖",
                     };
 
                     let reference_style = match item.kind {
