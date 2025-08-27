@@ -321,8 +321,10 @@ dependencies = [
  "clap",
  "folio-core",
  "folio-storage",
+ "folio-tui",
  "serde_json",
  "strum 0.25.0",
+ "tokio",
 ]
 
 [[package]]

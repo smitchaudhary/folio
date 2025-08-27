@@ -3,6 +3,10 @@ name = "folio-tui"
 version = "0.1.0"
 edition = "2024"
 
+[lib]
+name = "folio_tui"
+path = "src/lib.rs"
+
 [[bin]]
 name = "folio-tui"
 path = "src/main.rs"

@@ -7,18 +7,26 @@ use folio_storage::{
     append_to_archive, get_archive_path, get_inbox_path, load_config, load_items_from_file,
     save_config, save_inbox,
 };
+use folio_tui;
 use serde_json;
 use std::process;
 use std::str::FromStr;
+use tokio;
 
 fn main() {
-    if let Err(e) = run() {
-        eprintln!("Error: {}", e);
-        std::process::exit(1);
-    }
+    tokio::runtime::Builder::new_multi_thread()
+        .enable_all()
+        .build()
+        .unwrap()
+        .block_on(async {
+            if let Err(e) = run().await {
+                eprintln!("Error: {}", e);
+                std::process::exit(1);
+            }
+        });
 }
 
-fn run() -> Result<(), Box<dyn std::error::Error>> {
+async fn run() -> Result<(), Box<dyn std::error::Error>> {
     let cli = Cli::parse();
 
     match &cli.command {
@@ -31,40 +39,39 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
                 note,
                 kind,
             } => {
-                handle_add_command(name, r#type, author, link, note, kind)?;
+                handle_add_command(name, r#type, author, link, note, kind).await?;
             }
             Commands::List { status, r#type } => {
-                handle_list_command(status.as_deref(), r#type.as_deref())?;
+                handle_list_command(status.as_deref(), r#type.as_deref()).await?;
             }
             Commands::SetStatus { id, status } => {
-                handle_set_status_command(*id, status)?;
+                handle_set_status_command(*id, status).await?;
             }
             Commands::Edit { id } => {
-                handle_edit_command(*id)?;
+                handle_edit_command(*id).await?;
             }
             Commands::Archive { id } => {
-                handle_archive_command(*id)?;
+                handle_archive_command(*id).await?;
             }
             Commands::Delete { id } => {
-                handle_delete_command(*id)?;
+                handle_delete_command(*id).await?;
             }
             Commands::MarkRef { id } => {
-                handle_mark_ref_command(*id)?;
+                handle_mark_ref_command(*id).await?;
             }
             Commands::Config { subcommand } => {
-                handle_config_command(subcommand)?;
+                handle_config_command(subcommand).await?;
             }
         },
         None => {
-            // Default behavior when no subcommand is provided
-            println!("Running default TUI mode");
+            folio_tui::run_tui_default().await?;
         }
     }
 
     Ok(())
 }
 
-fn handle_list_command(
+async fn handle_list_command(
     status_filters: Option<&[String]>,
     type_filters: Option<&[String]>,
 ) -> Result<(), Box<dyn std::error::Error>> {
@@ -160,7 +167,7 @@ fn handle_list_command(
     Ok(())
 }
 
-fn handle_set_status_command(
+async fn handle_set_status_command(
     id: usize,
     status_str: &str,
 ) -> Result<(), Box<dyn std::error::Error>> {
@@ -222,7 +229,7 @@ fn handle_set_status_command(
     Ok(())
 }
 
-fn handle_edit_command(id: usize) -> Result<(), Box<dyn std::error::Error>> {
+async fn handle_edit_command(id: usize) -> Result<(), Box<dyn std::error::Error>> {
     let inbox_path = get_inbox_path()?;
     let archive_path = get_archive_path()?;
 
@@ -253,32 +260,32 @@ fn handle_edit_command(id: usize) -> Result<(), Box<dyn std::error::Error>> {
 
     println!("Editing item #{}. Leave blank to keep current value.", id);
     println!("Current name: {}", original_name);
-    let name_input = prompt_for_input("Name")?;
+    let name_input = prompt_for_input("Name").await?;
     if !name_input.is_empty() {
         item.name = name_input;
     }
 
     println!("Current type: {}", original_type);
-    let type_input = prompt_for_input("Type")?;
+    let type_input = prompt_for_input("Type").await?;
     if !type_input.is_empty() {
         item.item_type =
             ItemType::from_str(&type_input).map_err(|_| format!("Invalid type: {}", type_input))?;
     }
 
     println!("Current author: {}", original_author);
-    let author_input = prompt_for_input("Author")?;
+    let author_input = prompt_for_input("Author").await?;
     if !author_input.is_empty() {
         item.author = author_input;
     }
 
     println!("Current link: {}", original_link);
-    let link_input = prompt_for_input("Link")?;
+    let link_input = prompt_for_input("Link").await?;
     if !link_input.is_empty() {
         item.link = link_input;
     }
 
     println!("Current note: {}", original_note);
-    let note_input = prompt_for_input("Note")?;
+    let note_input = prompt_for_input("Note").await?;
     if !note_input.is_empty() {
         item.note = note_input;
     }
@@ -295,7 +302,7 @@ fn handle_edit_command(id: usize) -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
-fn handle_archive_command(id: usize) -> Result<(), Box<dyn std::error::Error>> {
+async fn handle_archive_command(id: usize) -> Result<(), Box<dyn std::error::Error>> {
     let inbox_path = get_inbox_path()?;
     let archive_path = get_archive_path()?;
     let mut inbox_items = load_items_from_file(&inbox_path)?;
@@ -319,7 +326,7 @@ fn handle_archive_command(id: usize) -> Result<(), Box<dyn std::error::Error>> {
     }
 }
 
-fn handle_delete_command(id: usize) -> Result<(), Box<dyn std::error::Error>> {
+async fn handle_delete_command(id: usize) -> Result<(), Box<dyn std::error::Error>> {
     let inbox_path = get_inbox_path()?;
     let archive_path = get_archive_path()?;
     let mut inbox_items = load_items_from_file(&inbox_path)?;
@@ -369,7 +376,7 @@ fn handle_delete_command(id: usize) -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
-fn handle_mark_ref_command(id: usize) -> Result<(), Box<dyn std::error::Error>> {
+async fn handle_mark_ref_command(id: usize) -> Result<(), Box<dyn std::error::Error>> {
     let inbox_path = get_inbox_path()?;
     let archive_path = get_archive_path()?;
     let mut inbox_items = load_items_from_file(&inbox_path)?;
@@ -428,7 +435,7 @@ fn format_item_status(item: &folio_core::Item) -> String {
     }
 }
 
-fn prompt_for_input(field_name: &str) -> Result<String, Box<dyn std::error::Error>> {
+async fn prompt_for_input(field_name: &str) -> Result<String, Box<dyn std::error::Error>> {
     use std::io::{Write, stdin, stdout};
 
     print!("{}: ", field_name);
@@ -439,7 +446,7 @@ fn prompt_for_input(field_name: &str) -> Result<String, Box<dyn std::error::Erro
     Ok(input.trim().to_string())
 }
 
-fn handle_add_command(
+async fn handle_add_command(
     name: &Option<String>,
     item_type: &Option<String>,
     author: &Option<String>,
@@ -448,19 +455,7 @@ fn handle_add_command(
     kind: &Option<String>,
 ) -> Result<(), Box<dyn std::error::Error>> {
     if name.is_none() {
-        let tui_path = std::env::current_exe()?;
-        let tui_dir = tui_path
-            .parent()
-            .ok_or("Could not determine TUI directory")?;
-        let tui_binary = tui_dir.join("folio-tui");
-
-        let output = std::process::Command::new(tui_binary)
-            .arg("--add")
-            .status()?;
-
-        if !output.success() {
-            return Err("Failed to launch TUI".into());
-        }
+        folio_tui::run_tui_add_form().await?;
         return Ok(());
     }
 
@@ -544,7 +539,7 @@ fn handle_add_command(
                     use std::io::{Write, stdin, stdout};
                     stdout().flush()?;
                     let mut input = String::new();
-                    stdin().read_line(&mut input)?;
+                    tokio::task::block_in_place(|| stdin().read_line(&mut input))?;
                     let response = input.trim().to_lowercase();
 
                     if response == "y" || response == "yes" {
@@ -611,7 +606,9 @@ fn handle_add_command(
     }
 }
 
-fn handle_config_command(subcommand: &ConfigSubcommands) -> Result<(), Box<dyn std::error::Error>> {
+async fn handle_config_command(
+    subcommand: &ConfigSubcommands,
+) -> Result<(), Box<dyn std::error::Error>> {
     match subcommand {
         ConfigSubcommands::List => {
             let config = load_config()?;

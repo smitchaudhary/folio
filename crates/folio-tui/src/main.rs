@@ -1,15 +1,12 @@
-use folio_tui::app::App;
+use folio_tui;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let args: Vec<String> = std::env::args().collect();
 
-    let mut app = if args.len() > 1 && args[1] == "--add" {
-        App::new_with_add_form()
+    if args.len() > 1 && args[1] == "--add" {
+        folio_tui::run_tui_add_form().await
     } else {
-        App::new()
-    };
-
-    app.run().await?;
-    Ok(())
+        folio_tui::run_tui_default().await
+    }
 }
