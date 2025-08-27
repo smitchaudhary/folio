@@ -240,6 +240,14 @@ impl App {
                 self.state.previous_item();
                 self.table_state.select(Some(self.state.selected_index));
             }
+            KeyCode::Char('j') => {
+                self.state.next_item();
+                self.table_state.select(Some(self.state.selected_index));
+            }
+            KeyCode::Char('k') => {
+                self.state.previous_item();
+                self.table_state.select(Some(self.state.selected_index));
+            }
             KeyCode::Char('s') => {
                 if let Some(item) = self.state.selected_item() {
                     let next_status = match item.status {
@@ -741,8 +749,8 @@ impl App {
 
         let help_text = vec![
             ratatui::text::Line::from("Navigation:"),
-            ratatui::text::Line::from("  ↑/↓      Move selection"),
-            ratatui::text::Line::from("  Tab      Switch between Inbox/Archive"),
+            ratatui::text::Line::from("  ↑/↓ or j/k    Move selection"),
+            ratatui::text::Line::from("  Tab            Switch between Inbox/Archive"),
             ratatui::text::Line::from(""),
             ratatui::text::Line::from("Item Actions:"),
             ratatui::text::Line::from("  Enter    Open link"),
