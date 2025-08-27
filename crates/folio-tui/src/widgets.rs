@@ -22,7 +22,7 @@ impl ItemsTable {
                     Row::new(vec!["ID", "S", "Name", "Type", "Added", "Author"])
                         .style(Style::default().bold()),
                     title,
-                    Style::default().fg(Color::Blue),
+                    Style::default().fg(Color::Green),
                 )
             }
             View::Archive => {
@@ -35,7 +35,7 @@ impl ItemsTable {
                     Row::new(vec!["ID", "R", "Name", "Done On", "Type", "Note"])
                         .style(Style::default().bold()),
                     title,
-                    Style::default().fg(Color::Green),
+                    Style::default().fg(Color::Blue),
                 )
             }
         };
