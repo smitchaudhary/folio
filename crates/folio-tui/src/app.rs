@@ -86,7 +86,7 @@ impl App {
         self.status_message = Some((message, Instant::now()));
     }
 
-    fn handle_key_event(&mut self, key_event: KeyEvent) {
+    async fn handle_key_event(&mut self, key_event: KeyEvent) {
         if self.show_help {
             if let KeyCode::Char('?') | KeyCode::Esc = key_event.code {
                 self.show_help = false;
@@ -104,7 +104,7 @@ impl App {
         if self.show_delete_confirmation {
             match key_event.code {
                 KeyCode::Char('y') | KeyCode::Char('Y') => {
-                    self.delete_selected_item();
+                    self.delete_selected_item().await;
                     self.show_delete_confirmation = false;
                 }
                 KeyCode::Char('n') | KeyCode::Char('N') | KeyCode::Esc => {
@@ -119,10 +119,10 @@ impl App {
             match key_event.code {
                 KeyCode::Char('y') | KeyCode::Char('Y') => {
                     if let Some(done_item) = self.state.move_selected_to_done() {
-                        let _ = append_item_to_archive(&done_item);
+                        let _ = append_item_to_archive(&done_item).await;
                         self.show_status_message("Item archived".to_string());
                     } else {
-                        let _ = self.save_data();
+                        let _ = self.save_data().await;
                     }
                     self.show_done_confirmation = false;
                 }
@@ -167,7 +167,7 @@ impl App {
                     self.add_form.toggle_visibility();
                 }
                 KeyCode::Enter => {
-                    if self.submit_add_form() {
+                    if self.submit_add_form().await {
                         self.add_form.toggle_visibility();
                     }
                 }
@@ -184,7 +184,7 @@ impl App {
                     self.edit_form.toggle_visibility();
                 }
                 KeyCode::Enter => {
-                    if self.submit_edit_form() {
+                    if self.submit_edit_form().await {
                         self.edit_form.toggle_visibility();
                     }
                 }
@@ -262,13 +262,13 @@ impl App {
             }
             KeyCode::Char('t') => {
                 if self.state.move_selected_to_todo() {
-                    let _ = self.save_data();
+                    let _ = self.save_data().await;
                     self.show_status_message("Status set to Todo".to_string());
                 }
             }
             KeyCode::Char('i') => {
                 if self.state.move_selected_to_doing() {
-                    let _ = self.save_data();
+                    let _ = self.save_data().await;
                     self.show_status_message("Status set to Doing".to_string());
                 }
             }
@@ -285,7 +285,7 @@ impl App {
                 self.show_delete_confirmation = true;
             }
             KeyCode::Char('r') => {
-                self.toggle_reference_status();
+                self.toggle_reference_status().await;
                 self.show_status_message("Reference status toggled".to_string());
             }
             KeyCode::Char('e') => {
@@ -327,7 +327,9 @@ impl App {
                 if let Some(item) = self.state.selected_item() {
                     if !item.link.is_empty() {
                         // Ensure link has a protocol for better compatibility
-                        let link_to_open = if item.link.starts_with("http://") || item.link.starts_with("https://") {
+                        let link_to_open = if item.link.starts_with("http://")
+                            || item.link.starts_with("https://")
+                        {
                             item.link.clone()
                         } else {
                             format!("https://{}", item.link)
@@ -383,7 +385,7 @@ impl App {
         }
     }
 
-    fn toggle_reference_status(&mut self) {
+    async fn toggle_reference_status(&mut self) {
         if self.state.current_view != View::Archive {
             return;
         }
@@ -393,7 +395,7 @@ impl App {
                 folio_core::Kind::Normal => item.kind = folio_core::Kind::Reference,
                 folio_core::Kind::Reference => item.kind = folio_core::Kind::Normal,
             }
-            let _ = self.save_data();
+            let _ = self.save_data().await;
         }
     }
 
@@ -441,7 +443,7 @@ impl App {
         }
     }
 
-    fn delete_selected_item(&mut self) {
+    async fn delete_selected_item(&mut self) {
         match self.state.current_view {
             View::Inbox => {
                 if !self.state.inbox_items.is_empty()
@@ -453,7 +455,7 @@ impl App {
                     {
                         self.state.selected_index = self.state.inbox_items.len() - 1;
                     }
-                    let _ = self.save_data();
+                    let _ = self.save_data().await;
                     self.show_status_message("Item deleted".to_string());
                 }
             }
@@ -467,14 +469,14 @@ impl App {
                     {
                         self.state.selected_index = self.state.archive_items.len() - 1;
                     }
-                    let _ = self.save_data();
+                    let _ = self.save_data().await;
                     self.show_status_message("Item deleted".to_string());
                 }
             }
         }
     }
 
-    fn submit_add_form(&mut self) -> bool {
+    async fn submit_add_form(&mut self) -> bool {
         let name = self
             .add_form
             .get_field_value("name")
@@ -539,10 +541,10 @@ impl App {
                     Ok((new_inbox, to_archive)) => {
                         self.state.inbox_items = new_inbox;
 
-                        let _ = self.save_data();
+                        let _ = self.save_data().await;
 
                         for item in &to_archive {
-                            let _ = append_item_to_archive(item);
+                            let _ = append_item_to_archive(item).await;
                         }
 
                         if !to_archive.is_empty() {
@@ -573,14 +575,14 @@ impl App {
             }
             Err(_) => {
                 self.state.inbox_items.push(new_item);
-                let _ = self.save_data();
+                let _ = self.save_data().await;
                 self.show_status_message("Item added".to_string());
                 true
             }
         }
     }
 
-    fn submit_edit_form(&mut self) -> bool {
+    async fn submit_edit_form(&mut self) -> bool {
         let name = self
             .edit_form
             .get_field_value("name")
@@ -627,7 +629,7 @@ impl App {
                 return false;
             }
 
-            let _ = self.save_data();
+            let _ = self.save_data().await;
             self.show_status_message("Item updated".to_string());
             true
         } else {
@@ -701,7 +703,7 @@ impl App {
             if let Some(event) = events.next().await {
                 match event {
                     AppEvent::Key(key_event) => {
-                        self.handle_key_event(key_event);
+                        self.handle_key_event(key_event).await;
                     }
                     AppEvent::Tick => {
                         if let Some((_, time)) = self.status_message {
