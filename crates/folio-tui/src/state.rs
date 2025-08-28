@@ -74,19 +74,6 @@ impl AppState {
         }
     }
 
-    pub fn cycle_selected_item_status(&mut self) -> Option<Item> {
-        if let Some(item) = self.selected_item_mut() {
-            let old_status = item.status.clone();
-            folio_core::cycle_status(item);
-            folio_core::update_timestamps(item);
-
-            if old_status != Status::Done && item.status == Status::Done {
-                return self.remove_selected_item();
-            }
-        }
-        None
-    }
-
     pub fn move_selected_to_done(&mut self) -> Option<Item> {
         if let Some(item) = self.selected_item_mut() {
             let old_status = item.status.clone();
@@ -110,11 +97,30 @@ impl AppState {
         }
     }
 
-    pub fn move_selected_to_todo(&mut self) {
+    pub fn move_selected_to_todo(&mut self) -> bool {
         if let Some(item) = self.selected_item_mut() {
+            let old_status = item.status.clone();
             item.status = Status::Todo;
             folio_core::update_timestamps(item);
+
+            if self.current_view == View::Archive && old_status == Status::Done {
+                let item_index = self.selected_index;
+                if item_index < self.archive_items.len() {
+                    let item = self.archive_items.remove(item_index);
+                    self.inbox_items.push(item);
+
+                    if self.selected_index >= self.archive_items.len()
+                        && !self.archive_items.is_empty()
+                    {
+                        self.selected_index = self.archive_items.len() - 1;
+                    }
+
+                    return true;
+                }
+            }
+            return true;
         }
+        false
     }
 
     fn remove_selected_item(&mut self) -> Option<Item> {

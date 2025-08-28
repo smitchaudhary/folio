@@ -1,14 +1,6 @@
 use crate::{Item, Status};
 use chrono::Utc;
 
-pub fn cycle_status(item: &mut Item) {
-    item.status = match item.status {
-        Status::Todo => Status::Doing,
-        Status::Doing => Status::Done,
-        Status::Done => Status::Todo,
-    };
-}
-
 pub fn update_timestamps(item: &mut Item) {
     match item.status {
         Status::Todo => {

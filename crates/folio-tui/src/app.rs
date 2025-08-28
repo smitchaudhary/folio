@@ -264,34 +264,22 @@ impl App {
                 self.state.jump_to_last();
                 self.table_state.select(Some(self.state.selected_index));
             }
-            KeyCode::Char('s') => {
-                if let Some(item) = self.state.selected_item() {
-                    let next_status = match item.status {
-                        folio_core::Status::Todo => folio_core::Status::Doing,
-                        folio_core::Status::Doing => folio_core::Status::Done,
-                        folio_core::Status::Done => folio_core::Status::Todo,
-                    };
-
-                    if next_status == folio_core::Status::Done {
-                        self.show_done_confirmation = true;
-                    } else {
-                        if let Some(done_item) = self.state.cycle_selected_item_status() {
-                            let _ = append_item_to_archive(&done_item);
-                            self.show_status_message("Item archived".to_string());
-                        } else {
-                            let _ = self.save_data();
-                        }
-                    }
+            KeyCode::Char('t') => {
+                if self.state.move_selected_to_todo() {
+                    let _ = self.save_data();
+                    self.show_status_message("Status set to Todo".to_string());
                 }
             }
             KeyCode::Char('i') => {
                 if self.state.move_selected_to_doing() {
                     let _ = self.save_data();
+                    self.show_status_message("Status set to Doing".to_string());
                 }
             }
             KeyCode::Char('d') => {
                 if self.state.selected_item().is_some() {
                     self.show_done_confirmation = true;
+                    self.show_status_message("Status set to Done".to_string());
                 }
             }
             KeyCode::Char('a') => {
@@ -772,8 +760,8 @@ impl App {
             ratatui::text::Line::from(""),
             ratatui::text::Line::from("Item Actions:"),
             ratatui::text::Line::from("  Enter    Open link"),
-            ratatui::text::Line::from("  s        Cycle status"),
-            ratatui::text::Line::from("  i        Set status to doing"),
+            ratatui::text::Line::from("  t        Set status to todo"),
+            ratatui::text::Line::from("  i        Set status to in progress"),
             ratatui::text::Line::from("  d        Set status to done"),
             ratatui::text::Line::from("  a        Add new item"),
             ratatui::text::Line::from("  e        Edit item"),
