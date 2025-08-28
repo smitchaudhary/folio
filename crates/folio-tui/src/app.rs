@@ -183,11 +183,7 @@ impl App {
                 KeyCode::Esc => {
                     self.edit_form.toggle_visibility();
                 }
-                KeyCode::Char('s')
-                    if key_event
-                        .modifiers
-                        .contains(crossterm::event::KeyModifiers::CONTROL) =>
-                {
+                KeyCode::Enter => {
                     if self.submit_edit_form() {
                         self.edit_form.toggle_visibility();
                     }

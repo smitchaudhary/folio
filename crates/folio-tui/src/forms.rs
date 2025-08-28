@@ -221,7 +221,13 @@ impl ItemForm {
             crossterm::event::KeyCode::BackTab => {
                 self.focus_prev();
             }
-            crossterm::event::KeyCode::Enter => {
+            crossterm::event::KeyCode::Down => {
+                self.focus_next();
+            }
+            crossterm::event::KeyCode::Up => {
+                self.focus_prev();
+            }
+            crossterm::event::KeyCode::Right => {
                 if let Some(field) = self.fields.get(&self.focused_field) {
                     if let FieldType::Dropdown { .. } = field.field_type {
                         if let Some(field) = self.fields.get_mut(&self.focused_field) {
@@ -234,6 +240,24 @@ impl ItemForm {
                     }
                 }
             }
+            crossterm::event::KeyCode::Left => {
+                if let Some(field) = self.fields.get(&self.focused_field) {
+                    if let FieldType::Dropdown { .. } = field.field_type {
+                        if let Some(field) = self.fields.get_mut(&self.focused_field) {
+                            if let FieldType::Dropdown { options, selected } = &mut field.field_type
+                            {
+                                if *selected == 0 {
+                                    *selected = options.len() - 1;
+                                } else {
+                                    *selected -= 1;
+                                }
+                                field.value = options[*selected].clone();
+                            }
+                        }
+                    }
+                }
+            }
+
             crossterm::event::KeyCode::Char(c) => {
                 if let Some(field) = self.fields.get_mut(&self.focused_field) {
                     if let FieldType::Text = field.field_type {
@@ -330,14 +354,7 @@ impl ItemForm {
             }
         }
 
-        let instructions_text = match self.form_type {
-            FormType::Add => {
-                "Tab: Next field, Shift+Tab: Previous field, Enter: Toggle dropdown, Esc: Cancel"
-            }
-            FormType::Edit => {
-                "Tab: Next field, Shift+Tab: Previous field, Enter: Toggle dropdown, Esc: Cancel, Ctrl+S: Save"
-            }
-        };
+        let instructions_text = "Tab/Shift+Tab or ↑/↓: Navigate fields, ←/→: Navigate dropdown, Enter: Save, Esc: Cancel";
 
         let instructions = Paragraph::new(instructions_text)
             .style(Style::default().fg(Color::Gray).italic())
