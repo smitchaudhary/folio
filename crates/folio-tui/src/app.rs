@@ -1,7 +1,4 @@
-use crate::data::{
-    append_item_to_archive, load_archive_items, load_inbox_items, save_archive_items,
-    save_inbox_items,
-};
+use crate::data::{load_archive_items, load_inbox_items, save_archive_items, save_inbox_items};
 use crate::event::{AppEvent, EventHandler};
 use crate::forms::{FormType, ItemForm};
 use crate::state::{AppState, View};
@@ -119,7 +116,8 @@ impl App {
             match key_event.code {
                 KeyCode::Char('y') | KeyCode::Char('Y') => {
                     if let Some(done_item) = self.state.move_selected_to_done() {
-                        let _ = append_item_to_archive(&done_item).await;
+                        self.state.add_item_to_archive(done_item);
+                        let _ = self.save_data().await;
                         self.show_status_message("Item archived".to_string());
                     } else {
                         let _ = self.save_data().await;
@@ -541,11 +539,11 @@ impl App {
                     Ok((new_inbox, to_archive)) => {
                         self.state.inbox_items = new_inbox;
 
-                        let _ = self.save_data().await;
-
                         for item in &to_archive {
-                            let _ = append_item_to_archive(item).await;
+                            self.state.add_item_to_archive(item.clone());
                         }
+
+                        let _ = self.save_data().await;
 
                         if !to_archive.is_empty() {
                             self.show_status_message(format!(
