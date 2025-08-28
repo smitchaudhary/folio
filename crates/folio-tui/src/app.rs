@@ -326,8 +326,25 @@ impl App {
             KeyCode::Enter => {
                 if let Some(item) = self.state.selected_item() {
                     if !item.link.is_empty() {
-                        let _ = opener::open(&item.link);
-                        self.show_status_message("Opening link...".to_string());
+                        // Ensure link has a protocol for better compatibility
+                        let link_to_open = if item.link.starts_with("http://") || item.link.starts_with("https://") {
+                            item.link.clone()
+                        } else {
+                            format!("https://{}", item.link)
+                        };
+
+                        match opener::open(&link_to_open) {
+                            Ok(_) => {
+                                self.show_status_message("Opening link...".to_string());
+                            }
+                            Err(_) => {
+                                // Try without https:// prefix if we added it
+                                if link_to_open != item.link {
+                                    let _ = opener::open(&item.link);
+                                }
+                                self.show_status_message("Opening link...".to_string());
+                            }
+                        }
                     }
                 }
             }
