@@ -19,7 +19,7 @@ impl ItemsTable {
                     " Inbox ".to_string()
                 };
                 (
-                    Row::new(vec!["ID", "S", "Name", "Type", "Added", "Author"])
+                    Row::new(vec!["ID", "S", "Name", "Type", "Added", "Author", "Link"])
                         .style(Style::default().fg(Color::White).bold()),
                     title,
                     Style::default().fg(Color::Green).bold(),
@@ -32,7 +32,7 @@ impl ItemsTable {
                     " Archive ".to_string()
                 };
                 (
-                    Row::new(vec!["ID", "R", "Name", "Done On", "Type", "Note"])
+                    Row::new(vec!["ID", "R", "Name", "Done On", "Type", "Note", "Link"])
                         .style(Style::default().fg(Color::White).bold()),
                     title,
                     Style::default().fg(Color::Blue).bold(),
@@ -68,6 +68,12 @@ impl ItemsTable {
 
                     let added_date = item.added_at.format("%Y-%m-%d").to_string();
 
+                    let link_display = if item.link.len() > 25 {
+                        format!("{}...", &item.link[..22])
+                    } else {
+                        item.link.clone()
+                    };
+
                     Row::new(vec![
                         (i + 1).to_string(),
                         status_char.to_string(),
@@ -75,6 +81,7 @@ impl ItemsTable {
                         item_type.to_string(),
                         added_date,
                         item.author.clone(),
+                        link_display,
                     ])
                     .style(status_style)
                 }
@@ -108,6 +115,12 @@ impl ItemsTable {
                         item.note.clone()
                     };
 
+                    let link_display = if item.link.len() > 20 {
+                        format!("{}...", &item.link[..17])
+                    } else {
+                        item.link.clone()
+                    };
+
                     Row::new(vec![
                         (i + 1).to_string(),
                         reference_char.to_string(),
@@ -115,6 +128,7 @@ impl ItemsTable {
                         done_date,
                         item_type.to_string(),
                         note,
+                        link_display,
                     ])
                     .style(reference_style)
                 }
@@ -125,18 +139,20 @@ impl ItemsTable {
             View::Inbox => vec![
                 Constraint::Length(3),
                 Constraint::Length(2),
-                Constraint::Percentage(40),
+                Constraint::Percentage(30),
                 Constraint::Length(5),
                 Constraint::Length(10),
-                Constraint::Percentage(30),
+                Constraint::Percentage(20),
+                Constraint::Percentage(25),
             ],
             View::Archive => vec![
                 Constraint::Length(3),
                 Constraint::Length(2),
-                Constraint::Percentage(40),
+                Constraint::Percentage(30),
                 Constraint::Length(10),
                 Constraint::Length(5),
-                Constraint::Percentage(30),
+                Constraint::Percentage(15),
+                Constraint::Percentage(20),
             ],
         };
 
