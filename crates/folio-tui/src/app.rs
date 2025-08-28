@@ -913,8 +913,11 @@ impl App {
             format!("{} | View: {} | Press ? for help", message_text, view_text)
         };
 
-        let paragraph = ratatui::widgets::Paragraph::new(status_text)
-            .style(ratatui::style::Style::default().fg(ratatui::style::Color::Gray));
+        let paragraph = ratatui::widgets::Paragraph::new(status_text).style(
+            ratatui::style::Style::default()
+                .fg(ratatui::style::Color::White)
+                .bg(ratatui::style::Color::Black),
+        );
 
         frame.render_widget(paragraph, area);
     }

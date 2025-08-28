@@ -20,9 +20,9 @@ impl ItemsTable {
                 };
                 (
                     Row::new(vec!["ID", "S", "Name", "Type", "Added", "Author"])
-                        .style(Style::default().bold()),
+                        .style(Style::default().fg(Color::White).bold()),
                     title,
-                    Style::default().fg(Color::Green),
+                    Style::default().fg(Color::Green).bold(),
                 )
             }
             View::Archive => {
@@ -33,9 +33,9 @@ impl ItemsTable {
                 };
                 (
                     Row::new(vec!["ID", "R", "Name", "Done On", "Type", "Note"])
-                        .style(Style::default().bold()),
+                        .style(Style::default().fg(Color::White).bold()),
                     title,
-                    Style::default().fg(Color::Blue),
+                    Style::default().fg(Color::Blue).bold(),
                 )
             }
         };
@@ -54,9 +54,9 @@ impl ItemsTable {
                     };
 
                     let status_style = match item.status {
-                        folio_core::Status::Todo => Style::default().fg(Color::DarkGray),
-                        folio_core::Status::Doing => Style::default().fg(Color::Yellow),
-                        folio_core::Status::Done => Style::default().fg(Color::Green),
+                        folio_core::Status::Todo => Style::default().fg(Color::Gray),
+                        folio_core::Status::Doing => Style::default().fg(Color::Yellow).bold(),
+                        folio_core::Status::Done => Style::default().fg(Color::Green).bold(),
                     };
 
                     let item_type = match item.item_type {
@@ -86,7 +86,7 @@ impl ItemsTable {
 
                     let reference_style = match item.kind {
                         folio_core::Kind::Normal => Style::default().fg(Color::White),
-                        folio_core::Kind::Reference => Style::default().fg(Color::Blue),
+                        folio_core::Kind::Reference => Style::default().fg(Color::Cyan).bold(),
                     };
 
                     let done_date = item
@@ -148,8 +148,8 @@ impl ItemsTable {
                     .title(title)
                     .border_style(border_style),
             )
-            .highlight_style(Style::default().reversed())
-            .highlight_symbol(">>");
+            .highlight_style(Style::default().fg(Color::Black).bg(Color::Cyan).bold())
+            .highlight_symbol("▶");
 
         frame.render_stateful_widget(table, area, &mut table_state.clone());
     }

@@ -274,7 +274,7 @@ impl ItemForm {
         let block = Block::default()
             .title(title)
             .borders(Borders::ALL)
-            .style(Style::default().bg(Color::Blue));
+            .style(Style::default().bg(Color::Black).fg(Color::White));
 
         frame.render_widget(block, popup_area);
 
@@ -299,10 +299,10 @@ impl ItemForm {
                 let field_area = inner_area[i];
 
                 let label = Paragraph::new(format!("{}:", field.label))
-                    .style(Style::default().fg(Color::White));
+                    .style(Style::default().fg(Color::Cyan).bold());
 
                 let value_style = if field.is_focused {
-                    Style::default().fg(Color::Yellow).reversed()
+                    Style::default().fg(Color::Black).bg(Color::Cyan).bold()
                 } else {
                     Style::default().fg(Color::White)
                 };
@@ -340,7 +340,7 @@ impl ItemForm {
         };
 
         let instructions = Paragraph::new(instructions_text)
-            .style(Style::default().fg(Color::Gray))
+            .style(Style::default().fg(Color::Gray).italic())
             .wrap(Wrap { trim: true });
 
         frame.render_widget(instructions, inner_area[6]);
