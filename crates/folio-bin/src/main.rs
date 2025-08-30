@@ -1,6 +1,7 @@
 use chrono::Utc;
 use clap::Parser;
 use folio_bin::cli::{Cli, Commands, ConfigSubcommands};
+use folio_bin::error::{CliError, print_error};
 use folio_core::add_with_cap;
 use folio_core::{Item, ItemType, Kind, OverflowStrategy, Status};
 use folio_storage::{
@@ -9,7 +10,7 @@ use folio_storage::{
 };
 use folio_tui;
 use serde_json;
-use std::process;
+
 use std::str::FromStr;
 use tokio;
 
@@ -20,13 +21,13 @@ fn main() {
         .unwrap()
         .block_on(async {
             if let Err(e) = run().await {
-                eprintln!("Error: {}", e);
+                print_error(&e);
                 std::process::exit(1);
             }
         });
 }
 
-async fn run() -> Result<(), Box<dyn std::error::Error>> {
+async fn run() -> Result<(), CliError> {
     let cli = Cli::parse();
 
     match &cli.command {
@@ -64,7 +65,11 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
             }
         },
         None => {
-            folio_tui::run_tui_default().await?;
+            folio_tui::run_tui_default()
+                .await
+                .map_err(|e| CliError::IoError {
+                    message: e.to_string(),
+                })?;
         }
     }
 
@@ -74,7 +79,7 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
 async fn handle_list_command(
     status_filters: Option<&[String]>,
     type_filters: Option<&[String]>,
-) -> Result<(), Box<dyn std::error::Error>> {
+) -> Result<(), CliError> {
     let inbox_path = get_inbox_path()?;
     let archive_path = get_archive_path()?;
 
@@ -167,10 +172,7 @@ async fn handle_list_command(
     Ok(())
 }
 
-async fn handle_set_status_command(
-    id: usize,
-    status_str: &str,
-) -> Result<(), Box<dyn std::error::Error>> {
+async fn handle_set_status_command(id: usize, status_str: &str) -> Result<(), CliError> {
     let inbox_path = get_inbox_path()?;
     let archive_path = get_archive_path()?;
 
@@ -183,8 +185,9 @@ async fn handle_set_status_command(
         let item_index = id - 1;
         let item = &mut inbox_items[item_index];
 
-        let new_status =
-            Status::from_str(status_str).map_err(|_| format!("Invalid status: {}", status_str))?;
+        let new_status = Status::from_str(status_str).map_err(|_| CliError::InvalidStatus {
+            status: status_str.to_string(),
+        })?;
 
         let item_status_changed_to_done = item.status != Status::Done && new_status == Status::Done;
 
@@ -208,8 +211,9 @@ async fn handle_set_status_command(
         let item_index = id - inbox_items.len() - 1;
         let item = &mut archive_items[item_index];
 
-        let new_status =
-            Status::from_str(status_str).map_err(|_| format!("Invalid status: {}", status_str))?;
+        let new_status = Status::from_str(status_str).map_err(|_| CliError::InvalidStatus {
+            status: status_str.to_string(),
+        })?;
 
         item.status = new_status;
 
@@ -220,7 +224,7 @@ async fn handle_set_status_command(
     }
 
     if !item_found {
-        return Err(format!("Item with ID {} not found", id).into());
+        return Err(CliError::ItemNotFound { id });
     }
 
     save_inbox(&inbox_items)?;
@@ -229,7 +233,7 @@ async fn handle_set_status_command(
     Ok(())
 }
 
-async fn handle_edit_command(id: usize) -> Result<(), Box<dyn std::error::Error>> {
+async fn handle_edit_command(id: usize) -> Result<(), CliError> {
     let inbox_path = get_inbox_path()?;
     let archive_path = get_archive_path()?;
 
@@ -243,7 +247,7 @@ async fn handle_edit_command(id: usize) -> Result<(), Box<dyn std::error::Error>
         let item_index = id - inbox_items.len() - 1;
         (false, item_index)
     } else {
-        return Err(format!("Item with ID {} not found", id).into());
+        return Err(CliError::ItemNotFound { id });
     };
 
     let item = if is_in_inbox {
@@ -269,7 +273,9 @@ async fn handle_edit_command(id: usize) -> Result<(), Box<dyn std::error::Error>
     let type_input = prompt_for_input("Type").await?;
     if !type_input.is_empty() {
         item.item_type =
-            ItemType::from_str(&type_input).map_err(|_| format!("Invalid type: {}", type_input))?;
+            ItemType::from_str(&type_input).map_err(|_| CliError::InvalidItemType {
+                item_type: type_input,
+            })?;
     }
 
     println!("Current author: {}", original_author);
@@ -302,7 +308,7 @@ async fn handle_edit_command(id: usize) -> Result<(), Box<dyn std::error::Error>
     Ok(())
 }
 
-async fn handle_archive_command(id: usize) -> Result<(), Box<dyn std::error::Error>> {
+async fn handle_archive_command(id: usize) -> Result<(), CliError> {
     let inbox_path = get_inbox_path()?;
     let archive_path = get_archive_path()?;
     let mut inbox_items = load_items_from_file(&inbox_path)?;
@@ -322,11 +328,11 @@ async fn handle_archive_command(id: usize) -> Result<(), Box<dyn std::error::Err
         println!("Item #{} is already in archive", id);
         Ok(())
     } else {
-        Err(format!("Item with ID {} not found", id).into())
+        Err(CliError::ItemNotFound { id })
     }
 }
 
-async fn handle_delete_command(id: usize) -> Result<(), Box<dyn std::error::Error>> {
+async fn handle_delete_command(id: usize) -> Result<(), CliError> {
     let inbox_path = get_inbox_path()?;
     let archive_path = get_archive_path()?;
     let mut inbox_items = load_items_from_file(&inbox_path)?;
@@ -341,7 +347,7 @@ async fn handle_delete_command(id: usize) -> Result<(), Box<dyn std::error::Erro
         let item = archive_items[item_index].clone();
         (false, item_index, item)
     } else {
-        return Err(format!("Item with ID {} not found", id).into());
+        return Err(CliError::ItemNotFound { id });
     };
 
     println!("Item to delete:");
@@ -376,7 +382,7 @@ async fn handle_delete_command(id: usize) -> Result<(), Box<dyn std::error::Erro
     Ok(())
 }
 
-async fn handle_mark_ref_command(id: usize) -> Result<(), Box<dyn std::error::Error>> {
+async fn handle_mark_ref_command(id: usize) -> Result<(), CliError> {
     let inbox_path = get_inbox_path()?;
     let archive_path = get_archive_path()?;
     let mut inbox_items = load_items_from_file(&inbox_path)?;
@@ -389,7 +395,7 @@ async fn handle_mark_ref_command(id: usize) -> Result<(), Box<dyn std::error::Er
         let item_index = id - inbox_items.len() - 1;
         (false, item_index)
     } else {
-        return Err(format!("Item with ID {} not found", id).into());
+        return Err(CliError::ItemNotFound { id });
     };
 
     if is_in_inbox {
@@ -435,7 +441,7 @@ fn format_item_status(item: &folio_core::Item) -> String {
     }
 }
 
-async fn prompt_for_input(field_name: &str) -> Result<String, Box<dyn std::error::Error>> {
+async fn prompt_for_input(field_name: &str) -> Result<String, CliError> {
     use std::io::{Write, stdin, stdout};
 
     print!("{}: ", field_name);
@@ -453,13 +459,19 @@ async fn handle_add_command(
     link: &Option<String>,
     note: &Option<String>,
     kind: &Option<String>,
-) -> Result<(), Box<dyn std::error::Error>> {
+) -> Result<(), CliError> {
     if name.is_none() {
-        folio_tui::run_tui_add_form().await?;
+        folio_tui::run_tui_add_form()
+            .await
+            .map_err(|e| CliError::IoError {
+                message: e.to_string(),
+            })?;
         return Ok(());
     }
 
-    let config = load_config()?;
+    let config = load_config().map_err(|e| CliError::ConfigError {
+        message: e.to_string(),
+    })?;
 
     let inbox_path = get_inbox_path()?;
     let inbox_items = load_items_from_file(&inbox_path)?;
@@ -598,25 +610,30 @@ async fn handle_add_command(
                 _ => {
                     // This shouldn't happen since we only return Err for Abort strategy
                     // But just in case, handle it gracefully
-                    eprintln!("Error: Inbox is full");
-                    std::process::exit(1);
+                    return Err(CliError::InboxFull {
+                        limit: config.max_items,
+                        suggestions: "This should not happen with current overflow strategies."
+                            .to_string(),
+                    });
                 }
             }
         }
     }
 }
 
-async fn handle_config_command(
-    subcommand: &ConfigSubcommands,
-) -> Result<(), Box<dyn std::error::Error>> {
+async fn handle_config_command(subcommand: &ConfigSubcommands) -> Result<(), CliError> {
     match subcommand {
         ConfigSubcommands::List => {
-            let config = load_config()?;
+            let config = load_config().map_err(|e| CliError::ConfigError {
+                message: e.to_string(),
+            })?;
             let json = serde_json::to_string_pretty(&config)?;
             println!("{}", json);
         }
         ConfigSubcommands::Get { key } => {
-            let config = load_config()?;
+            let config = load_config().map_err(|e| CliError::ConfigError {
+                message: e.to_string(),
+            })?;
             let config_value = serde_json::to_value(&config)?;
 
             match key.as_str() {
@@ -624,20 +641,22 @@ async fn handle_config_command(
                 "archive_on_overflow" => println!("{}", config_value["archive_on_overflow"]),
                 "version" | "_v" => println!("{}", config_value["_v"]),
                 _ => {
-                    eprintln!("Unknown config key: {}", key);
-                    process::exit(1);
+                    return Err(CliError::UnknownConfigKey { key: key.clone() });
                 }
             }
         }
         ConfigSubcommands::Set { key, value } => {
-            let mut config = load_config()?;
+            let mut config = load_config().map_err(|e| CliError::ConfigError {
+                message: e.to_string(),
+            })?;
 
             match key.as_str() {
                 "max_items" => match value.parse::<u32>() {
                     Ok(val) => config.max_items = val,
                     Err(_) => {
-                        eprintln!("Invalid value for max_items: {}", value);
-                        process::exit(1);
+                        return Err(CliError::InvalidMaxItems {
+                            value: value.clone(),
+                        });
                     }
                 },
                 "archive_on_overflow" => match value.as_str() {
@@ -645,25 +664,26 @@ async fn handle_config_command(
                     "todo" => config.archive_on_overflow = OverflowStrategy::Todo,
                     "any" => config.archive_on_overflow = OverflowStrategy::Any,
                     _ => {
-                        eprintln!(
-                            "Invalid value for archive_on_overflow: {}. Must be one of: abort, todo, any",
-                            value
-                        );
-                        process::exit(1);
+                        return Err(CliError::InvalidOverflowStrategy {
+                            value: value.to_string(),
+                        });
                     }
                 },
                 _ => {
-                    eprintln!("Unknown config key: {}", key);
-                    process::exit(1);
+                    return Err(CliError::UnknownConfigKey { key: key.clone() });
                 }
             }
 
-            save_config(&config)?;
+            save_config(&config).map_err(|e| CliError::ConfigError {
+                message: e.to_string(),
+            })?;
             println!("Config updated successfully");
         }
         ConfigSubcommands::Reset => {
             let config = folio_core::Config::default();
-            save_config(&config)?;
+            save_config(&config).map_err(|e| CliError::ConfigError {
+                message: e.to_string(),
+            })?;
             println!("Config reset to default values");
         }
     }

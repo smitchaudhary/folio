@@ -324,6 +324,7 @@ dependencies = [
  "folio-tui",
  "serde_json",
  "strum 0.25.0",
+ "thiserror",
  "tokio",
 ]
 
