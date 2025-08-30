@@ -56,9 +56,12 @@ impl ItemForm {
                 is_focused: false,
                 field_type: FieldType::Dropdown {
                     options: vec![
-                        "article".to_string(),
+                        "blog_post".to_string(),
                         "video".to_string(),
-                        "blog".to_string(),
+                        "podcast".to_string(),
+                        "news".to_string(),
+                        "thread".to_string(),
+                        "academic_paper".to_string(),
                         "other".to_string(),
                     ],
                     selected: 0,
@@ -111,9 +114,12 @@ impl ItemForm {
 
         if let Some(type_field) = self.fields.get_mut("type") {
             let type_str = match item.item_type {
-                folio_core::ItemType::Article => "article",
+                folio_core::ItemType::BlogPost => "blog_post",
                 folio_core::ItemType::Video => "video",
-                folio_core::ItemType::Blog => "blog",
+                folio_core::ItemType::Podcast => "podcast",
+                folio_core::ItemType::News => "news",
+                folio_core::ItemType::Thread => "thread",
+                folio_core::ItemType::AcademicPaper => "academic_paper",
                 folio_core::ItemType::Other => "other",
             };
             type_field.value = type_str.to_string();

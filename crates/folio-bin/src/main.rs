@@ -139,10 +139,13 @@ async fn handle_list_command(
         };
 
         let type_abbr = match item.item_type {
-            folio_core::ItemType::Article => "art.",
+            folio_core::ItemType::BlogPost => "blog",
             folio_core::ItemType::Video => "vid.",
-            folio_core::ItemType::Blog => "blog",
-            folio_core::ItemType::Other => "other",
+            folio_core::ItemType::Podcast => "pod.",
+            folio_core::ItemType::News => "news",
+            folio_core::ItemType::Thread => "thrd",
+            folio_core::ItemType::AcademicPaper => "acad",
+            folio_core::ItemType::Other => "oth.",
         };
 
         let added_date = item.added_at.format("%Y-%m-%d").to_string();
@@ -477,8 +480,8 @@ async fn handle_add_command(
     let inbox_items = load_items_from_file(&inbox_path)?;
 
     let parsed_type = match item_type {
-        Some(t) => ItemType::from_str(t).unwrap_or(ItemType::Article),
-        None => ItemType::Article,
+        Some(t) => ItemType::from_str(t).unwrap_or(ItemType::BlogPost),
+        None => ItemType::BlogPost,
     };
 
     let parsed_kind = match kind {
@@ -572,10 +575,13 @@ async fn handle_add_command(
                                 };
 
                                 let type_abbr = match item.item_type {
-                                    folio_core::ItemType::Article => "art.",
+                                    folio_core::ItemType::BlogPost => "blog",
                                     folio_core::ItemType::Video => "vid.",
-                                    folio_core::ItemType::Blog => "blog",
-                                    folio_core::ItemType::Other => "other",
+                                    folio_core::ItemType::Podcast => "pod.",
+                                    folio_core::ItemType::News => "news",
+                                    folio_core::ItemType::Thread => "thrd",
+                                    folio_core::ItemType::AcademicPaper => "acad",
+                                    folio_core::ItemType::Other => "oth.",
                                 };
 
                                 let added_date = item.added_at.format("%Y-%m-%d").to_string();

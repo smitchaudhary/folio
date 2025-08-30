@@ -509,9 +509,12 @@ impl App {
             name,
             item_type: match item_type.as_str() {
                 "video" => folio_core::ItemType::Video,
-                "blog" => folio_core::ItemType::Blog,
+                "podcast" => folio_core::ItemType::Podcast,
+                "news" => folio_core::ItemType::News,
+                "thread" => folio_core::ItemType::Thread,
+                "academic_paper" => folio_core::ItemType::AcademicPaper,
                 "other" => folio_core::ItemType::Other,
-                _ => folio_core::ItemType::Article,
+                _ => folio_core::ItemType::Other,
             },
             status: folio_core::Status::Todo,
             author,
@@ -615,9 +618,12 @@ impl App {
             item.name = name;
             item.item_type = match item_type.as_str() {
                 "video" => folio_core::ItemType::Video,
-                "blog" => folio_core::ItemType::Blog,
+                "podcast" => folio_core::ItemType::Podcast,
+                "news" => folio_core::ItemType::News,
+                "thread" => folio_core::ItemType::Thread,
+                "academic_paper" => folio_core::ItemType::AcademicPaper,
                 "other" => folio_core::ItemType::Other,
-                _ => folio_core::ItemType::Article,
+                _ => folio_core::ItemType::Other,
             };
             item.author = author;
             item.link = link;

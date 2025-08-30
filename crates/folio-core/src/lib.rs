@@ -16,15 +16,24 @@ pub use cap::add_with_cap;
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, EnumString)]
 pub enum ItemType {
-    #[serde(rename = "article")]
-    #[strum(serialize = "article")]
-    Article,
+    #[serde(rename = "blog_post")]
+    #[strum(serialize = "blog_post")]
+    BlogPost,
     #[serde(rename = "video")]
     #[strum(serialize = "video")]
     Video,
-    #[serde(rename = "blog")]
-    #[strum(serialize = "blog")]
-    Blog,
+    #[serde(rename = "podcast")]
+    #[strum(serialize = "podcast")]
+    Podcast,
+    #[serde(rename = "news")]
+    #[strum(serialize = "news")]
+    News,
+    #[serde(rename = "thread")]
+    #[strum(serialize = "thread")]
+    Thread,
+    #[serde(rename = "academic_paper")]
+    #[strum(serialize = "academic_paper")]
+    AcademicPaper,
     #[serde(rename = "other")]
     #[strum(serialize = "other")]
     Other,

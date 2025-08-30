@@ -60,9 +60,12 @@ impl ItemsTable {
                     };
 
                     let item_type = match item.item_type {
-                        folio_core::ItemType::Article => "art.",
+                        folio_core::ItemType::BlogPost => "blog",
                         folio_core::ItemType::Video => "vid.",
-                        folio_core::ItemType::Blog => "blog",
+                        folio_core::ItemType::Podcast => "pod.",
+                        folio_core::ItemType::News => "news",
+                        folio_core::ItemType::Thread => "thrd",
+                        folio_core::ItemType::AcademicPaper => "acad",
                         folio_core::ItemType::Other => "oth.",
                     };
 
@@ -103,9 +106,12 @@ impl ItemsTable {
                         .unwrap_or_else(|| "".to_string());
 
                     let item_type = match item.item_type {
-                        folio_core::ItemType::Article => "art.",
+                        folio_core::ItemType::BlogPost => "blog",
                         folio_core::ItemType::Video => "vid.",
-                        folio_core::ItemType::Blog => "blog",
+                        folio_core::ItemType::Podcast => "pod.",
+                        folio_core::ItemType::News => "news",
+                        folio_core::ItemType::Thread => "thrd",
+                        folio_core::ItemType::AcademicPaper => "acad",
                         folio_core::ItemType::Other => "oth.",
                     };
 
