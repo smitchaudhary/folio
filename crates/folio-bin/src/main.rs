@@ -182,25 +182,20 @@ async fn handle_set_status_command(id: usize, status_str: &str) -> Result<(), Cl
     let mut inbox_items = load_items_from_file(&inbox_path)?;
     let mut archive_items = load_items_from_file(&archive_path)?;
 
+    let new_status = Status::from_str(status_str).map_err(|_| CliError::InvalidStatus {
+        status: status_str.to_string(),
+    })?;
+
     let mut item_found = false;
 
     if id > 0 && id <= inbox_items.len() {
         let item_index = id - 1;
         let item = &mut inbox_items[item_index];
 
-        let new_status = Status::from_str(status_str).map_err(|_| CliError::InvalidStatus {
-            status: status_str.to_string(),
-        })?;
-
-        let item_status_changed_to_done = item.status != Status::Done && new_status == Status::Done;
-
-        item.status = new_status;
-
-        folio_core::update_timestamps(item);
-
+        let result = folio_core::change_item_status(item, new_status);
         item_found = true;
 
-        if item_status_changed_to_done {
+        if result.should_archive {
             let done_item = inbox_items.remove(item_index);
             archive_items.push(done_item);
             println!(
@@ -214,16 +209,19 @@ async fn handle_set_status_command(id: usize, status_str: &str) -> Result<(), Cl
         let item_index = id - inbox_items.len() - 1;
         let item = &mut archive_items[item_index];
 
-        let new_status = Status::from_str(status_str).map_err(|_| CliError::InvalidStatus {
-            status: status_str.to_string(),
-        })?;
-
-        item.status = new_status;
-
-        folio_core::update_timestamps(item);
-
+        let result = folio_core::change_item_status(item, new_status);
         item_found = true;
-        println!("Item #{} status updated to '{}'", id, status_str);
+
+        if result.should_move_to_inbox {
+            let item_to_move = archive_items.remove(item_index);
+            inbox_items.push(item_to_move);
+            println!(
+                "Item #{} status updated to '{}' and moved to inbox",
+                id, status_str
+            );
+        } else {
+            println!("Item #{} status updated to '{}'", id, status_str);
+        }
     }
 
     if !item_found {

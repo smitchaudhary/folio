@@ -9,7 +9,7 @@ mod config;
 pub use config::{Config, OverflowStrategy};
 
 mod status;
-pub use status::update_timestamps;
+pub use status::{StatusTransitionResult, change_item_status, update_timestamps};
 
 mod cap;
 pub use cap::add_with_cap;

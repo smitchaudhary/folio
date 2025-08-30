@@ -76,11 +76,9 @@ impl AppState {
 
     pub fn move_selected_to_done(&mut self) -> Option<Item> {
         if let Some(item) = self.selected_item_mut() {
-            let old_status = item.status.clone();
-            item.status = Status::Done;
-            folio_core::update_timestamps(item);
+            let result = folio_core::change_item_status(item, Status::Done);
 
-            if old_status != Status::Done {
+            if result.should_archive {
                 return self.remove_selected_item();
             }
         }
@@ -89,21 +87,9 @@ impl AppState {
 
     pub fn move_selected_to_doing(&mut self) -> bool {
         if let Some(item) = self.selected_item_mut() {
-            item.status = Status::Doing;
-            folio_core::update_timestamps(item);
-            true
-        } else {
-            false
-        }
-    }
+            let result = folio_core::change_item_status(item, Status::Doing);
 
-    pub fn move_selected_to_todo(&mut self) -> bool {
-        if let Some(item) = self.selected_item_mut() {
-            let old_status = item.status.clone();
-            item.status = Status::Todo;
-            folio_core::update_timestamps(item);
-
-            if self.current_view == View::Archive && old_status == Status::Done {
+            if result.should_move_to_inbox && self.current_view == View::Archive {
                 let item_index = self.selected_index;
                 if item_index < self.archive_items.len() {
                     let item = self.archive_items.remove(item_index);
@@ -114,13 +100,37 @@ impl AppState {
                     {
                         self.selected_index = self.archive_items.len() - 1;
                     }
-
-                    return true;
                 }
             }
-            return true;
+
+            result.status_changed
+        } else {
+            false
         }
-        false
+    }
+
+    pub fn move_selected_to_todo(&mut self) -> bool {
+        if let Some(item) = self.selected_item_mut() {
+            let result = folio_core::change_item_status(item, Status::Todo);
+
+            if result.should_move_to_inbox && self.current_view == View::Archive {
+                let item_index = self.selected_index;
+                if item_index < self.archive_items.len() {
+                    let item = self.archive_items.remove(item_index);
+                    self.inbox_items.push(item);
+
+                    if self.selected_index >= self.archive_items.len()
+                        && !self.archive_items.is_empty()
+                    {
+                        self.selected_index = self.archive_items.len() - 1;
+                    }
+                }
+            }
+
+            result.status_changed
+        } else {
+            false
+        }
     }
 
     fn remove_selected_item(&mut self) -> Option<Item> {
