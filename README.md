@@ -136,7 +136,7 @@ Folio stores config in `~/.folio/config.json`:
 
 ```json
 {
-  "max_items": 100,
+  "max_items": 30,
   "archive_on_overflow": "abort",
   "_v": 1
 }

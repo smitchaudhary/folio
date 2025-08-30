@@ -302,7 +302,7 @@ impl App {
                         OverflowStrategy::Any => 2,
                     };
                 } else {
-                    self.config_max_items_input = "100".to_string();
+                    self.config_max_items_input = "30".to_string();
                     self.config_overflow_strategy = 0;
                 }
             }

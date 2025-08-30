@@ -23,7 +23,7 @@ pub enum OverflowStrategy {
 impl Config {
     pub fn new() -> Self {
         Self {
-            max_items: 100,
+            max_items: 30,
             archive_on_overflow: OverflowStrategy::Abort,
             version: 1,
         }
