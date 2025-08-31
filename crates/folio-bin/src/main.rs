@@ -119,52 +119,12 @@ async fn handle_list_command(
         println!("No items found.");
         return Ok(());
     }
-    println!(
-        "{:<4} {:<6} {:<30} {:<10} {:<20} {:<15}",
-        "ID", "Status", "Name", "Type", "Added", "Author"
-    );
-    println!("{}", "-".repeat(100));
+
+    println!("{}", folio_core::Item::format_list_header());
+    println!("{}", folio_core::Item::format_list_separator());
 
     for (index, item) in filtered_items.iter().enumerate() {
-        let status_char = match item.status {
-            folio_core::Status::Todo => "T",
-            folio_core::Status::Doing => "D",
-            folio_core::Status::Done => "✓",
-        };
-
-        let type_abbr = match item.item_type {
-            folio_core::ItemType::BlogPost => "blog",
-            folio_core::ItemType::Video => "vid.",
-            folio_core::ItemType::Podcast => "pod.",
-            folio_core::ItemType::News => "news",
-            folio_core::ItemType::Thread => "thrd",
-            folio_core::ItemType::AcademicPaper => "acad",
-            folio_core::ItemType::Other => "oth.",
-        };
-
-        let added_date = item.added_at.format("%Y-%m-%d").to_string();
-
-        let name_display = if item.name.len() > 28 {
-            format!("{}..", &item.name[..26])
-        } else {
-            item.name.clone()
-        };
-
-        let author_display = if item.author.len() > 13 {
-            format!("{}..", &item.author[..11])
-        } else {
-            item.author.clone()
-        };
-
-        println!(
-            "{:<4} {:<6} {:<30} {:<10} {:<20} {:<15}",
-            index + 1,
-            status_char,
-            name_display,
-            type_abbr,
-            added_date,
-            author_display
-        );
+        println!("{}", item.format_for_list(index + 1));
     }
     Ok(())
 }
@@ -229,7 +189,7 @@ async fn handle_set_status_command(id: usize, status_str: &str) -> Result<(), Cl
                             to_archive.len()
                         );
                         for item in to_archive {
-                            println!("  - {} ({})", item.name, format_item_status(&item));
+                            println!("  - {} ({})", item.name, item.status.as_string());
                         }
                     } else {
                         println!(
@@ -461,14 +421,6 @@ async fn handle_mark_ref_command(id: usize) -> Result<(), CliError> {
     Ok(())
 }
 
-fn format_item_status(item: &folio_core::Item) -> String {
-    match item.status {
-        folio_core::Status::Todo => "todo".to_string(),
-        folio_core::Status::Doing => "doing".to_string(),
-        folio_core::Status::Done => "done".to_string(),
-    }
-}
-
 async fn prompt_for_input(field_name: &str) -> Result<String, CliError> {
     use std::io::{Write, stdin, stdout};
 
@@ -530,7 +482,7 @@ async fn handle_add_command(
                     "Item added successfully. The following item(s) were automatically archived due to overflow:"
                 );
                 for item in to_archive {
-                    println!("  - {} ({})", item.name, format_item_status(&item));
+                    println!("  - {} ({})", item.name, item.status.as_string());
                 }
             } else {
                 println!("Item added successfully");
@@ -564,52 +516,11 @@ async fn handle_add_command(
                         let inbox_items = load_items_from_file(&inbox_path)?;
                         if !inbox_items.is_empty() {
                             println!();
-                            println!(
-                                "{:<4} {:<6} {:<30} {:<10} {:<20} {:<15}",
-                                "ID", "Status", "Name", "Type", "Added", "Author"
-                            );
-                            println!("{}", "-".repeat(100));
+                            println!("{}", folio_core::Item::format_list_header());
+                            println!("{}", folio_core::Item::format_list_separator());
 
                             for (index, item) in inbox_items.iter().enumerate() {
-                                let status_char = match item.status {
-                                    folio_core::Status::Todo => "T",
-                                    folio_core::Status::Doing => "D",
-                                    folio_core::Status::Done => "✓",
-                                };
-
-                                let type_abbr = match item.item_type {
-                                    folio_core::ItemType::BlogPost => "blog",
-                                    folio_core::ItemType::Video => "vid.",
-                                    folio_core::ItemType::Podcast => "pod.",
-                                    folio_core::ItemType::News => "news",
-                                    folio_core::ItemType::Thread => "thrd",
-                                    folio_core::ItemType::AcademicPaper => "acad",
-                                    folio_core::ItemType::Other => "oth.",
-                                };
-
-                                let added_date = item.added_at.format("%Y-%m-%d").to_string();
-
-                                let name_display = if item.name.len() > 28 {
-                                    format!("{}..", &item.name[..26])
-                                } else {
-                                    item.name.clone()
-                                };
-
-                                let author_display = if item.author.len() > 13 {
-                                    format!("{}..", &item.author[..11])
-                                } else {
-                                    item.author.clone()
-                                };
-
-                                println!(
-                                    "{:<4} {:<6} {:<30} {:<10} {:<20} {:<15}",
-                                    index + 1,
-                                    status_char,
-                                    name_display,
-                                    type_abbr,
-                                    added_date,
-                                    author_display
-                                );
+                                println!("{}", item.format_for_list(index + 1));
                             }
                         }
                     }

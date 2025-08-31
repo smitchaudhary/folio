@@ -47,11 +47,7 @@ impl ItemsTable {
             let item = &items[i];
             match app_state.current_view {
                 View::Inbox => {
-                    let status_char = match item.status {
-                        folio_core::Status::Todo => "📝",
-                        folio_core::Status::Doing => "⏳",
-                        folio_core::Status::Done => "✅",
-                    };
+                    let status_char = item.status.display_emoji();
 
                     let status_style = match item.status {
                         folio_core::Status::Todo => Style::default().fg(Color::Gray),
@@ -59,15 +55,7 @@ impl ItemsTable {
                         folio_core::Status::Done => Style::default().fg(Color::Green).bold(),
                     };
 
-                    let item_type = match item.item_type {
-                        folio_core::ItemType::BlogPost => "blog",
-                        folio_core::ItemType::Video => "vid.",
-                        folio_core::ItemType::Podcast => "pod.",
-                        folio_core::ItemType::News => "news",
-                        folio_core::ItemType::Thread => "thrd",
-                        folio_core::ItemType::AcademicPaper => "acad",
-                        folio_core::ItemType::Other => "oth.",
-                    };
+                    let item_type = item.item_type.abbreviation();
 
                     let added_date = item.added_at.format("%Y-%m-%d").to_string();
 
@@ -89,10 +77,7 @@ impl ItemsTable {
                     .style(status_style)
                 }
                 View::Archive => {
-                    let reference_char = match item.kind {
-                        folio_core::Kind::Normal => "✅",
-                        folio_core::Kind::Reference => "🔖",
-                    };
+                    let reference_char = item.kind.display_emoji();
 
                     let reference_style = match item.kind {
                         folio_core::Kind::Normal => Style::default().fg(Color::White),
@@ -105,15 +90,7 @@ impl ItemsTable {
                         .map(|dt| dt.format("%Y-%m-%d").to_string())
                         .unwrap_or_else(|| "".to_string());
 
-                    let item_type = match item.item_type {
-                        folio_core::ItemType::BlogPost => "blog",
-                        folio_core::ItemType::Video => "vid.",
-                        folio_core::ItemType::Podcast => "pod.",
-                        folio_core::ItemType::News => "news",
-                        folio_core::ItemType::Thread => "thrd",
-                        folio_core::ItemType::AcademicPaper => "acad",
-                        folio_core::ItemType::Other => "oth.",
-                    };
+                    let item_type = item.item_type.abbreviation();
 
                     let note = if item.note.is_empty() {
                         "–".to_string()

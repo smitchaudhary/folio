@@ -113,15 +113,7 @@ impl ItemForm {
         }
 
         if let Some(type_field) = self.fields.get_mut("type") {
-            let type_str = match item.item_type {
-                folio_core::ItemType::BlogPost => "blog_post",
-                folio_core::ItemType::Video => "video",
-                folio_core::ItemType::Podcast => "podcast",
-                folio_core::ItemType::News => "news",
-                folio_core::ItemType::Thread => "thread",
-                folio_core::ItemType::AcademicPaper => "academic_paper",
-                folio_core::ItemType::Other => "other",
-            };
+            let type_str = item.item_type.as_string();
             type_field.value = type_str.to_string();
 
             if let FieldType::Dropdown { options, selected } = &mut type_field.field_type {

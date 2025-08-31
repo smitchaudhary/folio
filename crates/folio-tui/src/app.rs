@@ -9,6 +9,7 @@ use crossterm::event::{KeyCode, KeyEvent};
 use folio_core::{Item, OverflowStrategy};
 use folio_storage::load_config;
 use ratatui::widgets::TableState;
+use std::str::FromStr;
 use std::time::{Duration, Instant};
 
 pub struct App {
@@ -609,15 +610,8 @@ impl App {
 
         if let Some(item) = self.state.selected_item_mut() {
             item.name = name;
-            item.item_type = match item_type.as_str() {
-                "video" => folio_core::ItemType::Video,
-                "podcast" => folio_core::ItemType::Podcast,
-                "news" => folio_core::ItemType::News,
-                "thread" => folio_core::ItemType::Thread,
-                "academic_paper" => folio_core::ItemType::AcademicPaper,
-                "other" => folio_core::ItemType::Other,
-                _ => folio_core::ItemType::Other,
-            };
+            item.item_type =
+                folio_core::ItemType::from_str(&item_type).unwrap_or(folio_core::ItemType::Other);
             item.author = author;
             item.link = link;
             item.note = note;

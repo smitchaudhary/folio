@@ -63,6 +63,15 @@ pub enum Kind {
     Reference,
 }
 
+impl Kind {
+    pub fn display_emoji(&self) -> &'static str {
+        match self {
+            Kind::Normal => "✅",
+            Kind::Reference => "🔖",
+        }
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Item {
     pub name: String,
@@ -80,6 +89,58 @@ pub struct Item {
     pub version: u8,
 }
 
+impl ItemType {
+    pub fn abbreviation(&self) -> &'static str {
+        match self {
+            ItemType::BlogPost => "blog",
+            ItemType::Video => "vid.",
+            ItemType::Podcast => "pod.",
+            ItemType::News => "news",
+            ItemType::Thread => "thrd",
+            ItemType::AcademicPaper => "acad",
+            ItemType::Other => "oth.",
+        }
+    }
+
+    pub fn as_string(&self) -> &'static str {
+        match self {
+            ItemType::BlogPost => "blog_post",
+            ItemType::Video => "video",
+            ItemType::Podcast => "podcast",
+            ItemType::News => "news",
+            ItemType::Thread => "thread",
+            ItemType::AcademicPaper => "academic_paper",
+            ItemType::Other => "other",
+        }
+    }
+}
+
+impl Status {
+    pub fn display_char(&self) -> &'static str {
+        match self {
+            Status::Todo => "T",
+            Status::Doing => "D",
+            Status::Done => "✓",
+        }
+    }
+
+    pub fn display_emoji(&self) -> &'static str {
+        match self {
+            Status::Todo => "📝",
+            Status::Doing => "⏳",
+            Status::Done => "✅",
+        }
+    }
+
+    pub fn as_string(&self) -> &'static str {
+        match self {
+            Status::Todo => "todo",
+            Status::Doing => "doing",
+            Status::Done => "done",
+        }
+    }
+}
+
 impl Item {
     pub fn validate(&self) -> Result<(), CoreError> {
         if self.name.is_empty() {
@@ -88,6 +149,43 @@ impl Item {
             ));
         }
         Ok(())
+    }
+
+    pub fn format_for_list(&self, index: usize) -> String {
+        let name_display = if self.name.len() > 28 {
+            format!("{}..", &self.name[..26])
+        } else {
+            self.name.clone()
+        };
+
+        let author_display = if self.author.len() > 13 {
+            format!("{}..", &self.author[..11])
+        } else {
+            self.author.clone()
+        };
+
+        let added_date = self.added_at.format("%Y-%m-%d").to_string();
+
+        format!(
+            "{:<4} {:<6} {:<30} {:<10} {:<20} {:<15}",
+            index,
+            self.status.display_char(),
+            name_display,
+            self.item_type.abbreviation(),
+            added_date,
+            author_display
+        )
+    }
+
+    pub fn format_list_header() -> String {
+        format!(
+            "{:<4} {:<6} {:<30} {:<10} {:<20} {:<15}",
+            "ID", "Status", "Name", "Type", "Added", "Author"
+        )
+    }
+
+    pub fn format_list_separator() -> String {
+        "-".repeat(100)
     }
 }
 
