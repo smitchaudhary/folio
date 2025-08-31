@@ -1,4 +1,5 @@
 use crate::data::{load_archive_items, load_inbox_items, save_archive_items, save_inbox_items};
+use crate::error::TuiResult;
 use crate::event::{AppEvent, EventHandler};
 use crate::forms::{FormType, ItemForm};
 use crate::state::{AppState, View};
@@ -61,7 +62,7 @@ impl App {
         app
     }
 
-    pub async fn load_data(&mut self) -> Result<(), Box<dyn std::error::Error>> {
+    pub async fn load_data(&mut self) -> TuiResult<()> {
         let inbox_items = load_inbox_items().await?;
         let archive_items = load_archive_items().await?;
 
@@ -71,7 +72,7 @@ impl App {
         Ok(())
     }
 
-    pub async fn save_data(&mut self) -> Result<(), Box<dyn std::error::Error>> {
+    pub async fn save_data(&mut self) -> TuiResult<()> {
         save_inbox_items(self.state.get_inbox_items()).await?;
         save_archive_items(self.state.get_archive_items()).await?;
         self.show_status_message("Saved".to_string());
@@ -633,7 +634,7 @@ impl App {
         }
     }
 
-    pub async fn run(&mut self) -> Result<(), Box<dyn std::error::Error>> {
+    pub async fn run(&mut self) -> TuiResult<()> {
         self.load_data().await?;
 
         let mut terminal = setup_terminal()?;

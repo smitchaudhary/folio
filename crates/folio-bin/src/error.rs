@@ -35,6 +35,9 @@ pub enum CliError {
 
     #[error("Storage error: {0}")]
     Storage(#[from] folio_storage::StorageError),
+
+    #[error("TUI error: {0}")]
+    Tui(#[from] folio_tui::TuiError),
 }
 
 impl From<Box<dyn std::error::Error>> for CliError {

@@ -63,11 +63,7 @@ async fn run() -> Result<(), CliError> {
             }
         },
         None => {
-            folio_tui::run_tui_default()
-                .await
-                .map_err(|e| CliError::IoError {
-                    message: e.to_string(),
-                })?;
+            folio_tui::run_tui_default().await?;
         }
     }
 
@@ -493,11 +489,7 @@ async fn handle_add_command(
     kind: &Option<String>,
 ) -> Result<(), CliError> {
     if name.is_none() {
-        folio_tui::run_tui_add_form()
-            .await
-            .map_err(|e| CliError::IoError {
-                message: e.to_string(),
-            })?;
+        folio_tui::run_tui_add_form().await?;
         return Ok(());
     }
 

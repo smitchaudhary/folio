@@ -1,7 +1,7 @@
-use folio_tui;
+use folio_tui::{self, TuiResult};
 
 #[tokio::main]
-async fn main() -> Result<(), Box<dyn std::error::Error>> {
+async fn main() -> TuiResult<()> {
     let args: Vec<String> = std::env::args().collect();
 
     if args.len() > 1 && args[1] == "--add" {
