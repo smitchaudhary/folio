@@ -147,10 +147,8 @@ impl AppState {
                 .iter()
                 .enumerate()
                 .filter(|(_, item)| {
-                    let text_match = item.name.to_lowercase().contains(&filter.to_lowercase())
-                        || item.author.to_lowercase().contains(&filter.to_lowercase());
-
-                    text_match
+                    item.name.to_lowercase().contains(&filter.to_lowercase())
+                        || item.author.to_lowercase().contains(&filter.to_lowercase())
                 })
                 .map(|(index, _)| index)
                 .collect()
@@ -192,11 +190,12 @@ impl AppState {
             self.inbox_items = result.inbox_items.clone();
             self.archive_items = result.archive_items.clone();
 
-            if self.current_view == View::Archive && result.moved_to_inbox {
-                if self.selected_index >= self.archive_items.len() && !self.archive_items.is_empty()
-                {
-                    self.selected_index = self.archive_items.len() - 1;
-                }
+            if self.current_view == View::Archive
+                && result.moved_to_inbox
+                && self.selected_index >= self.archive_items.len()
+                && !self.archive_items.is_empty()
+            {
+                self.selected_index = self.archive_items.len() - 1;
             }
 
             Ok(result)

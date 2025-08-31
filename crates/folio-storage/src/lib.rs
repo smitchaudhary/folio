@@ -1,5 +1,4 @@
 use folio_core::{Config, Item};
-use serde_json;
 use std::fs::{self, File, OpenOptions};
 use std::io::{BufRead, BufReader, Read, Write};
 use std::path::{Path, PathBuf};

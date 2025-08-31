@@ -170,7 +170,7 @@ impl ItemForm {
     }
 
     pub fn focus_next(&mut self) {
-        let field_order = vec!["name", "type", "author", "link", "note"];
+        let field_order = ["name", "type", "author", "link", "note"];
         let current_index = field_order
             .iter()
             .position(|&f| f == self.focused_field)
@@ -189,7 +189,7 @@ impl ItemForm {
     }
 
     pub fn focus_prev(&mut self) {
-        let field_order = vec!["name", "type", "author", "link", "note"];
+        let field_order = ["name", "type", "author", "link", "note"];
         let current_index = field_order
             .iter()
             .position(|&f| f == self.focused_field)
@@ -314,7 +314,7 @@ impl ItemForm {
             ])
             .split(popup_area);
 
-        let field_order = vec!["name", "type", "author", "link", "note"];
+        let field_order = ["name", "type", "author", "link", "note"];
 
         for (i, field_name) in field_order.iter().enumerate() {
             if let Some(field) = self.fields.get(*field_name) {

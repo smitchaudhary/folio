@@ -88,7 +88,7 @@ impl ItemsTable {
                         .finished_at
                         .as_ref()
                         .map(|dt| dt.format("%Y-%m-%d").to_string())
-                        .unwrap_or_else(|| "".to_string());
+                        .unwrap_or_default();
 
                     let item_type = item.item_type.abbreviation();
 

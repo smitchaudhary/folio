@@ -6,11 +6,8 @@ use folio_storage::{
     ConfigManager, append_to_archive, get_archive_path, get_inbox_path, load_items_from_file,
     save_inbox,
 };
-use folio_tui;
-use serde_json;
 
 use std::str::FromStr;
-use tokio;
 
 fn main() {
     tokio::runtime::Builder::new_multi_thread()
@@ -95,7 +92,7 @@ async fn handle_list_command(
                 if !status_filters.is_empty() {
                     let matches = status_filters.iter().any(|s| {
                         Status::from_str(&s.to_lowercase())
-                            .map_or(false, |status| status == item.status)
+                            .is_ok_and(|status| status == item.status)
                     });
                     if !matches {
                         return false;
@@ -107,7 +104,7 @@ async fn handle_list_command(
                 if !type_filters.is_empty() {
                     let matches = type_filters.iter().any(|t| {
                         ItemType::from_str(&t.to_lowercase())
-                            .map_or(false, |item_type| item_type == item.item_type)
+                            .is_ok_and(|item_type| item_type == item.item_type)
                     });
                     if !matches {
                         return false;
@@ -491,11 +488,11 @@ async fn handle_add_command(
                 _ => {
                     // This shouldn't happen since we only return Err for Abort strategy
                     // But just in case, handle it gracefully
-                    return Err(CliError::InboxFull {
+                    Err(CliError::InboxFull {
                         limit: config.max_items,
                         suggestions: "This should not happen with current overflow strategies."
                             .to_string(),
-                    });
+                    })
                 }
             }
         }
