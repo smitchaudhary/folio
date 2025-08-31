@@ -92,13 +92,41 @@ impl AppState {
             if result.should_move_to_inbox && self.current_view == View::Archive {
                 let item_index = self.selected_index;
                 if item_index < self.archive_items.len() {
-                    let item = self.archive_items.remove(item_index);
-                    self.inbox_items.push(item);
+                    let item_to_move = self.archive_items.remove(item_index);
 
-                    if self.selected_index >= self.archive_items.len()
-                        && !self.archive_items.is_empty()
-                    {
-                        self.selected_index = self.archive_items.len() - 1;
+                    if let Ok(config) = folio_storage::load_config() {
+                        match folio_core::add_with_cap(
+                            self.inbox_items.clone(),
+                            item_to_move.clone(),
+                            config.max_items as usize,
+                            config.archive_on_overflow,
+                        ) {
+                            Ok((new_inbox, to_archive)) => {
+                                self.inbox_items = new_inbox;
+
+                                for displaced_item in to_archive {
+                                    self.archive_items.push(displaced_item);
+                                }
+
+                                if self.selected_index >= self.archive_items.len()
+                                    && !self.archive_items.is_empty()
+                                {
+                                    self.selected_index = self.archive_items.len() - 1;
+                                }
+                            }
+                            Err(_) => {
+                                self.archive_items.insert(item_index, item_to_move);
+                                return false;
+                            }
+                        }
+                    } else {
+                        self.inbox_items.push(item_to_move);
+
+                        if self.selected_index >= self.archive_items.len()
+                            && !self.archive_items.is_empty()
+                        {
+                            self.selected_index = self.archive_items.len() - 1;
+                        }
                     }
                 }
             }
@@ -116,13 +144,41 @@ impl AppState {
             if result.should_move_to_inbox && self.current_view == View::Archive {
                 let item_index = self.selected_index;
                 if item_index < self.archive_items.len() {
-                    let item = self.archive_items.remove(item_index);
-                    self.inbox_items.push(item);
+                    let item_to_move = self.archive_items.remove(item_index);
 
-                    if self.selected_index >= self.archive_items.len()
-                        && !self.archive_items.is_empty()
-                    {
-                        self.selected_index = self.archive_items.len() - 1;
+                    if let Ok(config) = folio_storage::load_config() {
+                        match folio_core::add_with_cap(
+                            self.inbox_items.clone(),
+                            item_to_move.clone(),
+                            config.max_items as usize,
+                            config.archive_on_overflow,
+                        ) {
+                            Ok((new_inbox, to_archive)) => {
+                                self.inbox_items = new_inbox;
+
+                                for displaced_item in to_archive {
+                                    self.archive_items.push(displaced_item);
+                                }
+
+                                if self.selected_index >= self.archive_items.len()
+                                    && !self.archive_items.is_empty()
+                                {
+                                    self.selected_index = self.archive_items.len() - 1;
+                                }
+                            }
+                            Err(_) => {
+                                self.archive_items.insert(item_index, item_to_move);
+                                return false;
+                            }
+                        }
+                    } else {
+                        self.inbox_items.push(item_to_move);
+
+                        if self.selected_index >= self.archive_items.len()
+                            && !self.archive_items.is_empty()
+                        {
+                            self.selected_index = self.archive_items.len() - 1;
+                        }
                     }
                 }
             }

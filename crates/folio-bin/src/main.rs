@@ -214,11 +214,49 @@ async fn handle_set_status_command(id: usize, status_str: &str) -> Result<(), Cl
 
         if result.should_move_to_inbox {
             let item_to_move = archive_items.remove(item_index);
-            inbox_items.push(item_to_move);
-            println!(
-                "Item #{} status updated to '{}' and moved to inbox",
-                id, status_str
-            );
+
+            let config = load_config().map_err(|e| CliError::ConfigError {
+                message: e.to_string(),
+            })?;
+
+            match add_with_cap(
+                inbox_items,
+                item_to_move.clone(),
+                config.max_items as usize,
+                config.archive_on_overflow,
+            ) {
+                Ok((new_inbox, to_archive)) => {
+                    inbox_items = new_inbox;
+
+                    for item in &to_archive {
+                        archive_items.push(item.clone());
+                    }
+
+                    if !to_archive.is_empty() {
+                        println!(
+                            "Item #{} status updated to '{}' and moved to inbox. {} item(s) were archived due to overflow:",
+                            id,
+                            status_str,
+                            to_archive.len()
+                        );
+                        for item in to_archive {
+                            println!("  - {} ({})", item.name, format_item_status(&item));
+                        }
+                    } else {
+                        println!(
+                            "Item #{} status updated to '{}' and moved to inbox",
+                            id, status_str
+                        );
+                    }
+                }
+                Err(_) => {
+                    archive_items.insert(item_index, item_to_move);
+                    return Err(CliError::InboxFull {
+                        limit: config.max_items,
+                        suggestions: "Delete an existing inbox item, archive an item, or change overflow strategy".to_string(),
+                    });
+                }
+            }
         } else {
             println!("Item #{} status updated to '{}'", id, status_str);
         }

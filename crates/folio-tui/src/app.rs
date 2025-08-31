@@ -262,12 +262,20 @@ impl App {
                 if self.state.move_selected_to_todo() {
                     let _ = self.save_data().await;
                     self.show_status_message("Status set to Todo".to_string());
+                } else if self.state.current_view == View::Archive {
+                    self.show_status_message(
+                        "Cannot move to inbox: capacity limit reached".to_string(),
+                    );
                 }
             }
             KeyCode::Char('i') => {
                 if self.state.move_selected_to_doing() {
                     let _ = self.save_data().await;
                     self.show_status_message("Status set to Doing".to_string());
+                } else if self.state.current_view == View::Archive {
+                    self.show_status_message(
+                        "Cannot move to inbox: capacity limit reached".to_string(),
+                    );
                 }
             }
             KeyCode::Char('d') => {
