@@ -4,16 +4,16 @@ use thiserror::Error;
 pub enum TuiError {
     #[error("Storage error: {0}")]
     Storage(#[from] folio_storage::StorageError),
-    
+
     #[error("Core error: {0}")]
     Core(#[from] folio_core::CoreError),
-    
+
     #[error("Terminal I/O error: {0}")]
     Io(#[from] std::io::Error),
-    
+
     #[error("Configuration error: {message}")]
     Config { message: String },
-    
+
     #[error("Application error: {message}")]
     Application { message: String },
 }

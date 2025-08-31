@@ -1,7 +1,7 @@
 use folio_core::Item;
 use folio_storage::{
-    append_to_archive, get_archive_path, get_inbox_path, load_items_from_file, save_archive,
-    save_inbox, StorageResult,
+    StorageResult, append_to_archive, get_archive_path, get_inbox_path, load_items_from_file,
+    save_archive, save_inbox,
 };
 
 pub async fn load_inbox_items() -> StorageResult<Vec<Item>> {
