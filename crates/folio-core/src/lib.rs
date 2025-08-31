@@ -246,3 +246,86 @@ pub fn add_item_to_inbox(
     )
     .map_err(|_| CoreError::InboxFull)
 }
+
+#[derive(Debug)]
+pub struct StatusUpdateResult {
+    pub inbox_items: Vec<Item>,
+    pub archive_items: Vec<Item>,
+    pub moved_to_archive: Vec<Item>,
+    pub moved_to_inbox: bool,
+    pub overflow_items: Vec<Item>,
+    pub item_found: bool,
+}
+
+pub fn update_item_status(
+    item_id: usize,
+    new_status: Status,
+    mut inbox_items: Vec<Item>,
+    mut archive_items: Vec<Item>,
+    config: &Config,
+) -> Result<StatusUpdateResult, CoreError> {
+    let mut result = StatusUpdateResult {
+        inbox_items: inbox_items.clone(),
+        archive_items: archive_items.clone(),
+        moved_to_archive: Vec::new(),
+        moved_to_inbox: false,
+        overflow_items: Vec::new(),
+        item_found: false,
+    };
+
+    if item_id > 0 && item_id <= inbox_items.len() {
+        let item_index = item_id - 1;
+        let item = &mut inbox_items[item_index];
+
+        let status_result = change_item_status(item, new_status);
+        result.item_found = true;
+
+        if status_result.should_archive {
+            let done_item = inbox_items.remove(item_index);
+            result.moved_to_archive.push(done_item.clone());
+            archive_items.push(done_item);
+        }
+
+        result.inbox_items = inbox_items;
+        result.archive_items = archive_items;
+        return Ok(result);
+    }
+
+    if item_id > inbox_items.len() && item_id <= inbox_items.len() + archive_items.len() {
+        let item_index = item_id - inbox_items.len() - 1;
+        let item = &mut archive_items[item_index];
+
+        let status_result = change_item_status(item, new_status);
+        result.item_found = true;
+
+        if status_result.should_move_to_inbox {
+            let item_to_move = archive_items.remove(item_index);
+            result.moved_to_inbox = true;
+
+            match add_item_to_inbox(inbox_items.clone(), item_to_move.clone(), config) {
+                Ok((new_inbox, to_archive)) => {
+                    inbox_items = new_inbox;
+                    result.overflow_items = to_archive.clone();
+
+                    for overflow_item in to_archive {
+                        archive_items.push(overflow_item);
+                    }
+                }
+                Err(_) => {
+                    // Rollback - put item back in archive
+                    archive_items.insert(item_index, item_to_move);
+                    result.inbox_items = inbox_items;
+                    result.archive_items = archive_items;
+                    return Err(CoreError::InboxFull);
+                }
+            }
+        } else {
+            result.archive_items = archive_items;
+        }
+
+        result.inbox_items = inbox_items;
+        return Ok(result);
+    }
+
+    Ok(result)
+}

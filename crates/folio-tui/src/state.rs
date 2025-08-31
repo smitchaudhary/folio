@@ -75,10 +75,8 @@ impl AppState {
     }
 
     pub fn move_selected_to_done(&mut self) -> Option<Item> {
-        if let Some(item) = self.selected_item_mut() {
-            let result = folio_core::change_item_status(item, Status::Done);
-
-            if result.should_archive {
+        if self.change_selected_status(Status::Done) {
+            if self.current_view == View::Inbox {
                 return self.remove_selected_item();
             }
         }
@@ -86,107 +84,11 @@ impl AppState {
     }
 
     pub fn move_selected_to_doing(&mut self) -> bool {
-        if let Some(item) = self.selected_item_mut() {
-            let result = folio_core::change_item_status(item, Status::Doing);
-
-            if result.should_move_to_inbox && self.current_view == View::Archive {
-                let item_index = self.selected_index;
-                if item_index < self.archive_items.len() {
-                    let item_to_move = self.archive_items.remove(item_index);
-
-                    if let Ok(config_manager) = folio_storage::ConfigManager::new() {
-                        let config = config_manager.get();
-                        match folio_core::add_item_to_inbox(
-                            self.inbox_items.clone(),
-                            item_to_move.clone(),
-                            config,
-                        ) {
-                            Ok((new_inbox, to_archive)) => {
-                                self.inbox_items = new_inbox;
-
-                                for displaced_item in to_archive {
-                                    self.archive_items.push(displaced_item);
-                                }
-
-                                if self.selected_index >= self.archive_items.len()
-                                    && !self.archive_items.is_empty()
-                                {
-                                    self.selected_index = self.archive_items.len() - 1;
-                                }
-                            }
-                            Err(_) => {
-                                self.archive_items.insert(item_index, item_to_move);
-                                return false;
-                            }
-                        }
-                    } else {
-                        self.inbox_items.push(item_to_move);
-
-                        if self.selected_index >= self.archive_items.len()
-                            && !self.archive_items.is_empty()
-                        {
-                            self.selected_index = self.archive_items.len() - 1;
-                        }
-                    }
-                }
-            }
-
-            result.status_changed
-        } else {
-            false
-        }
+        self.change_selected_status(Status::Doing)
     }
 
     pub fn move_selected_to_todo(&mut self) -> bool {
-        if let Some(item) = self.selected_item_mut() {
-            let result = folio_core::change_item_status(item, Status::Todo);
-
-            if result.should_move_to_inbox && self.current_view == View::Archive {
-                let item_index = self.selected_index;
-                if item_index < self.archive_items.len() {
-                    let item_to_move = self.archive_items.remove(item_index);
-
-                    if let Ok(config_manager) = folio_storage::ConfigManager::new() {
-                        let config = config_manager.get();
-                        match folio_core::add_item_to_inbox(
-                            self.inbox_items.clone(),
-                            item_to_move.clone(),
-                            config,
-                        ) {
-                            Ok((new_inbox, to_archive)) => {
-                                self.inbox_items = new_inbox;
-
-                                for displaced_item in to_archive {
-                                    self.archive_items.push(displaced_item);
-                                }
-
-                                if self.selected_index >= self.archive_items.len()
-                                    && !self.archive_items.is_empty()
-                                {
-                                    self.selected_index = self.archive_items.len() - 1;
-                                }
-                            }
-                            Err(_) => {
-                                self.archive_items.insert(item_index, item_to_move);
-                                return false;
-                            }
-                        }
-                    } else {
-                        self.inbox_items.push(item_to_move);
-
-                        if self.selected_index >= self.archive_items.len()
-                            && !self.archive_items.is_empty()
-                        {
-                            self.selected_index = self.archive_items.len() - 1;
-                        }
-                    }
-                }
-            }
-
-            result.status_changed
-        } else {
-            false
-        }
+        self.change_selected_status(Status::Todo)
     }
 
     fn remove_selected_item(&mut self) -> Option<Item> {
@@ -276,5 +178,51 @@ impl AppState {
 
     pub fn set_filter(&mut self, filter: Option<String>) {
         self.filter = filter;
+    }
+
+    fn change_selected_status(&mut self, new_status: Status) -> bool {
+        if self.current_items().is_empty() || self.selected_index >= self.current_items().len() {
+            return false;
+        }
+
+        let item_id = match self.current_view {
+            View::Inbox => self.selected_index + 1,
+            View::Archive => self.inbox_items.len() + self.selected_index + 1,
+        };
+
+        if let Ok(config_manager) = folio_storage::ConfigManager::new() {
+            let config = config_manager.get();
+
+            match folio_core::update_item_status(
+                item_id,
+                new_status,
+                self.inbox_items.clone(),
+                self.archive_items.clone(),
+                config,
+            ) {
+                Ok(result) => {
+                    if result.item_found {
+                        self.inbox_items = result.inbox_items;
+                        self.archive_items = result.archive_items;
+
+                        // Adjust selected index if needed
+                        if self.current_view == View::Archive && result.moved_to_inbox {
+                            if self.selected_index >= self.archive_items.len()
+                                && !self.archive_items.is_empty()
+                            {
+                                self.selected_index = self.archive_items.len() - 1;
+                            }
+                        }
+
+                        return true;
+                    }
+                }
+                Err(_) => {
+                    return false;
+                }
+            }
+        }
+
+        false
     }
 }

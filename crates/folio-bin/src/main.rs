@@ -141,88 +141,49 @@ async fn handle_set_status_command(
     let inbox_path = get_inbox_path()?;
     let archive_path = get_archive_path()?;
 
-    let mut inbox_items = load_items_from_file(&inbox_path)?;
-    let mut archive_items = load_items_from_file(&archive_path)?;
+    let inbox_items = load_items_from_file(&inbox_path)?;
+    let archive_items = load_items_from_file(&archive_path)?;
 
     let new_status = Status::from_str(status_str).map_err(|_| CliError::InvalidStatus {
         status: status_str.to_string(),
     })?;
 
-    let mut item_found = false;
+    let config = config_manager.get();
+    let result =
+        folio_core::update_item_status(id, new_status, inbox_items, archive_items, config)?;
 
-    if id > 0 && id <= inbox_items.len() {
-        let item_index = id - 1;
-        let item = &mut inbox_items[item_index];
-
-        let result = folio_core::change_item_status(item, new_status);
-        item_found = true;
-
-        if result.should_archive {
-            let done_item = inbox_items.remove(item_index);
-            archive_items.push(done_item);
-            println!(
-                "Item #{} status updated to '{}' and moved to archive",
-                id, status_str
-            );
-        } else {
-            println!("Item #{} status updated to '{}'", id, status_str);
-        }
-    } else if id > inbox_items.len() && id <= inbox_items.len() + archive_items.len() {
-        let item_index = id - inbox_items.len() - 1;
-        let item = &mut archive_items[item_index];
-
-        let result = folio_core::change_item_status(item, new_status);
-        item_found = true;
-
-        if result.should_move_to_inbox {
-            let item_to_move = archive_items.remove(item_index);
-
-            let config = config_manager.get();
-
-            match folio_core::add_item_to_inbox(inbox_items, item_to_move.clone(), config) {
-                Ok((new_inbox, to_archive)) => {
-                    inbox_items = new_inbox;
-
-                    for item in &to_archive {
-                        archive_items.push(item.clone());
-                    }
-
-                    if !to_archive.is_empty() {
-                        println!(
-                            "Item #{} status updated to '{}' and moved to inbox. {} item(s) were archived due to overflow:",
-                            id,
-                            status_str,
-                            to_archive.len()
-                        );
-                        for item in to_archive {
-                            println!("  - {} ({})", item.name, item.status.as_string());
-                        }
-                    } else {
-                        println!(
-                            "Item #{} status updated to '{}' and moved to inbox",
-                            id, status_str
-                        );
-                    }
-                }
-                Err(_) => {
-                    archive_items.insert(item_index, item_to_move);
-                    return Err(CliError::InboxFull {
-                        limit: config.max_items,
-                        suggestions: "Delete an existing inbox item, archive an item, or change overflow strategy".to_string(),
-                    });
-                }
-            }
-        } else {
-            println!("Item #{} status updated to '{}'", id, status_str);
-        }
-    }
-
-    if !item_found {
+    if !result.item_found {
         return Err(CliError::ItemNotFound { id });
     }
 
-    save_inbox(&inbox_items)?;
-    folio_storage::save_archive(&archive_items)?;
+    if !result.moved_to_archive.is_empty() {
+        println!(
+            "Item #{} status updated to '{}' and moved to archive",
+            id, status_str
+        );
+    } else if result.moved_to_inbox {
+        if !result.overflow_items.is_empty() {
+            println!(
+                "Item #{} status updated to '{}' and moved to inbox. {} item(s) were archived due to overflow:",
+                id,
+                status_str,
+                result.overflow_items.len()
+            );
+            for item in &result.overflow_items {
+                println!("  - {} ({})", item.name, item.status.as_string());
+            }
+        } else {
+            println!(
+                "Item #{} status updated to '{}' and moved to inbox",
+                id, status_str
+            );
+        }
+    } else {
+        println!("Item #{} status updated to '{}'", id, status_str);
+    }
+
+    save_inbox(&result.inbox_items)?;
+    folio_storage::save_archive(&result.archive_items)?;
 
     Ok(())
 }
