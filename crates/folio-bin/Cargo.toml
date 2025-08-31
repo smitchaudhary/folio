@@ -3,6 +3,10 @@ name = "folio-bin"
 version = "0.1.0"
 edition = "2024"
 
+[[bin]]
+name = "folio"
+path = "src/main.rs"
+
 [dependencies]
 clap = { workspace = true }
 folio-core = { path = "../folio-core" }
