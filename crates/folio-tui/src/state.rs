@@ -1,4 +1,4 @@
-use folio_core::{Item, Status};
+use folio_core::{CoreError, Item, Status, StatusUpdateResult};
 
 #[derive(PartialEq)]
 pub enum View {
@@ -74,39 +74,22 @@ impl AppState {
         }
     }
 
-    pub fn move_selected_to_done(&mut self) -> Option<Item> {
-        if self.change_selected_status(Status::Done) {
-            if self.current_view == View::Inbox {
-                return self.remove_selected_item();
-            }
+    pub fn move_selected_to_done(&mut self) -> Result<Option<Item>, CoreError> {
+        let result = self.change_selected_status(Status::Done)?;
+
+        if self.current_view == View::Inbox && !result.moved_to_archive.is_empty() {
+            Ok(result.moved_to_archive.into_iter().next())
+        } else {
+            Ok(None)
         }
-        None
     }
 
-    pub fn move_selected_to_doing(&mut self) -> bool {
+    pub fn move_selected_to_doing(&mut self) -> Result<StatusUpdateResult, CoreError> {
         self.change_selected_status(Status::Doing)
     }
 
-    pub fn move_selected_to_todo(&mut self) -> bool {
+    pub fn move_selected_to_todo(&mut self) -> Result<StatusUpdateResult, CoreError> {
         self.change_selected_status(Status::Todo)
-    }
-
-    fn remove_selected_item(&mut self) -> Option<Item> {
-        if self.current_view != View::Inbox {
-            return None;
-        }
-
-        if self.inbox_items.is_empty() || self.selected_index >= self.inbox_items.len() {
-            return None;
-        }
-
-        let removed_item = self.inbox_items.remove(self.selected_index);
-
-        if self.selected_index >= self.inbox_items.len() && !self.inbox_items.is_empty() {
-            self.selected_index = self.inbox_items.len() - 1;
-        }
-
-        Some(removed_item)
     }
 
     pub fn next_item(&mut self) {
@@ -180,9 +163,12 @@ impl AppState {
         self.filter = filter;
     }
 
-    fn change_selected_status(&mut self, new_status: Status) -> bool {
+    fn change_selected_status(
+        &mut self,
+        new_status: Status,
+    ) -> Result<StatusUpdateResult, CoreError> {
         if self.current_items().is_empty() || self.selected_index >= self.current_items().len() {
-            return false;
+            return Err(CoreError::ItemNotFound);
         }
 
         let item_id = match self.current_view {
@@ -190,39 +176,32 @@ impl AppState {
             View::Archive => self.inbox_items.len() + self.selected_index + 1,
         };
 
-        if let Ok(config_manager) = folio_storage::ConfigManager::new() {
-            let config = config_manager.get();
+        let config_manager = folio_storage::ConfigManager::new()
+            .map_err(|_| CoreError::ValidationError("Failed to load config".to_string()))?;
+        let config = config_manager.get();
 
-            match folio_core::update_item_status(
-                item_id,
-                new_status,
-                self.inbox_items.clone(),
-                self.archive_items.clone(),
-                config,
-            ) {
-                Ok(result) => {
-                    if result.item_found {
-                        self.inbox_items = result.inbox_items;
-                        self.archive_items = result.archive_items;
+        let result = folio_core::update_item_status(
+            item_id,
+            new_status,
+            self.inbox_items.clone(),
+            self.archive_items.clone(),
+            config,
+        )?;
 
-                        // Adjust selected index if needed
-                        if self.current_view == View::Archive && result.moved_to_inbox {
-                            if self.selected_index >= self.archive_items.len()
-                                && !self.archive_items.is_empty()
-                            {
-                                self.selected_index = self.archive_items.len() - 1;
-                            }
-                        }
+        if result.item_found {
+            self.inbox_items = result.inbox_items.clone();
+            self.archive_items = result.archive_items.clone();
 
-                        return true;
-                    }
-                }
-                Err(_) => {
-                    return false;
+            if self.current_view == View::Archive && result.moved_to_inbox {
+                if self.selected_index >= self.archive_items.len() && !self.archive_items.is_empty()
+                {
+                    self.selected_index = self.archive_items.len() - 1;
                 }
             }
-        }
 
-        false
+            Ok(result)
+        } else {
+            Err(CoreError::ItemNotFound)
+        }
     }
 }

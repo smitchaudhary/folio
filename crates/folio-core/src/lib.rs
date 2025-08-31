@@ -319,11 +319,10 @@ pub fn update_item_status(
                     return Err(CoreError::InboxFull);
                 }
             }
-        } else {
-            result.archive_items = archive_items;
         }
 
         result.inbox_items = inbox_items;
+        result.archive_items = archive_items;
         return Ok(result);
     }
 
