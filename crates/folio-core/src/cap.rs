@@ -15,7 +15,9 @@ pub fn add_with_cap(
         OverflowStrategy::Abort => Err(CapError::Full),
         OverflowStrategy::Todo => {
             if let Some(pos) = inbox.iter().position(|i| i.status == Status::Todo) {
-                let removed = inbox.remove(pos);
+                let mut removed = inbox.remove(pos);
+                removed.status = Status::Done;
+                crate::status::update_timestamps(&mut removed);
                 inbox.push(new_item);
                 Ok((inbox, vec![removed]))
             } else {
@@ -24,7 +26,9 @@ pub fn add_with_cap(
         }
         OverflowStrategy::Any => {
             if !inbox.is_empty() {
-                let removed = inbox.remove(0);
+                let mut removed = inbox.remove(0);
+                removed.status = Status::Done;
+                crate::status::update_timestamps(&mut removed);
                 inbox.push(new_item);
                 Ok((inbox, vec![removed]))
             } else {

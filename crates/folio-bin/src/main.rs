@@ -271,13 +271,16 @@ async fn handle_archive_command(id: usize) -> Result<(), CliError> {
 
     if id > 0 && id <= inbox_items.len() {
         let item_index = id - 1;
-        let item = inbox_items.remove(item_index);
+        let mut item = inbox_items.remove(item_index);
+
+        item.status = Status::Done;
+        folio_core::update_timestamps(&mut item);
 
         append_to_archive(&item)?;
 
         save_inbox(&inbox_items)?;
 
-        println!("Item #{} archived successfully", id);
+        println!("Item #{} marked as done and archived successfully", id);
         Ok(())
     } else if id > inbox_items.len() && id <= inbox_items.len() + archive_items.len() {
         println!("Item #{} is already in archive", id);
@@ -340,7 +343,7 @@ async fn handle_delete_command(id: usize) -> Result<(), CliError> {
 async fn handle_mark_ref_command(id: usize) -> Result<(), CliError> {
     let inbox_path = get_inbox_path()?;
     let archive_path = get_archive_path()?;
-    let mut inbox_items = load_items_from_file(&inbox_path)?;
+    let inbox_items = load_items_from_file(&inbox_path)?;
     let mut archive_items = load_items_from_file(&archive_path)?;
 
     let (is_in_inbox, item_index) = if id > 0 && id <= inbox_items.len() {
@@ -354,21 +357,10 @@ async fn handle_mark_ref_command(id: usize) -> Result<(), CliError> {
     };
 
     if is_in_inbox {
-        let item = &mut inbox_items[item_index];
-        match item.kind {
-            folio_core::Kind::Normal => {
-                item.kind = folio_core::Kind::Reference;
-                let ref_item = inbox_items.remove(item_index);
-                append_to_archive(&ref_item)?;
-                save_inbox(&inbox_items)?;
-                println!("Item #{} marked as reference and moved to archive", id);
-            }
-            folio_core::Kind::Reference => {
-                item.kind = folio_core::Kind::Normal;
-                save_inbox(&inbox_items)?;
-                println!("Item #{} unmarked as reference", id);
-            }
-        }
+        println!(
+            "Cannot mark reference for items in inbox. Only archived (done) items can be marked as references."
+        );
+        return Ok(());
     } else {
         let item = &mut archive_items[item_index];
         match item.kind {
@@ -428,8 +420,11 @@ async fn handle_add_command(
     )?;
 
     if matches!(new_item.kind, Kind::Reference) {
-        append_to_archive(&new_item)?;
-        println!("Added reference item directly to archive");
+        let mut ref_item = new_item;
+        ref_item.status = Status::Done;
+        folio_core::update_timestamps(&mut ref_item);
+        append_to_archive(&ref_item)?;
+        println!("Added reference item as done and archived");
         return Ok(());
     }
 
