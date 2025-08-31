@@ -95,11 +95,10 @@ impl AppState {
                     let item_to_move = self.archive_items.remove(item_index);
 
                     if let Ok(config) = folio_storage::load_config() {
-                        match folio_core::add_with_cap(
+                        match folio_core::add_item_to_inbox(
                             self.inbox_items.clone(),
                             item_to_move.clone(),
-                            config.max_items as usize,
-                            config.archive_on_overflow,
+                            &config,
                         ) {
                             Ok((new_inbox, to_archive)) => {
                                 self.inbox_items = new_inbox;
@@ -147,11 +146,10 @@ impl AppState {
                     let item_to_move = self.archive_items.remove(item_index);
 
                     if let Ok(config) = folio_storage::load_config() {
-                        match folio_core::add_with_cap(
+                        match folio_core::add_item_to_inbox(
                             self.inbox_items.clone(),
                             item_to_move.clone(),
-                            config.max_items as usize,
-                            config.archive_on_overflow,
+                            &config,
                         ) {
                             Ok((new_inbox, to_archive)) => {
                                 self.inbox_items = new_inbox;

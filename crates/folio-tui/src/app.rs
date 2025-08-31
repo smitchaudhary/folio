@@ -4,9 +4,8 @@ use crate::forms::{FormType, ItemForm};
 use crate::state::{AppState, View};
 use crate::terminal::{restore_terminal, setup_terminal};
 use crate::widgets::ItemsTable;
-use chrono::Utc;
 use crossterm::event::{KeyCode, KeyEvent};
-use folio_core::{Item, OverflowStrategy, add_with_cap};
+use folio_core::{Item, OverflowStrategy};
 use folio_storage::load_config;
 use ratatui::widgets::TableState;
 use std::time::{Duration, Instant};
@@ -513,39 +512,24 @@ impl App {
             .cloned()
             .unwrap_or_default();
 
-        let new_item = folio_core::Item {
+        let new_item = match folio_core::create_item(
             name,
-            item_type: match item_type.as_str() {
-                "video" => folio_core::ItemType::Video,
-                "podcast" => folio_core::ItemType::Podcast,
-                "news" => folio_core::ItemType::News,
-                "thread" => folio_core::ItemType::Thread,
-                "academic_paper" => folio_core::ItemType::AcademicPaper,
-                "other" => folio_core::ItemType::Other,
-                _ => folio_core::ItemType::Other,
-            },
-            status: folio_core::Status::Todo,
-            author,
-            link,
-            added_at: Utc::now(),
-            started_at: None,
-            finished_at: None,
-            note,
-            kind: folio_core::Kind::Normal,
-            version: 1,
+            Some(item_type),
+            Some(author),
+            Some(link),
+            Some(note),
+            None,
+        ) {
+            Ok(item) => item,
+            Err(_) => return false,
         };
-
-        if new_item.validate().is_err() {
-            return false;
-        }
 
         match load_config() {
             Ok(config) => {
-                match add_with_cap(
+                match folio_core::add_item_to_inbox(
                     self.state.inbox_items.clone(),
                     new_item,
-                    config.max_items as usize,
-                    config.archive_on_overflow,
+                    &config,
                 ) {
                     Ok((new_inbox, to_archive)) => {
                         self.state.inbox_items = new_inbox;

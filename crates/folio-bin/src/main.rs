@@ -1,9 +1,7 @@
-use chrono::Utc;
 use clap::Parser;
 use folio_bin::cli::{Cli, Commands, ConfigSubcommands};
 use folio_bin::error::{CliError, print_error};
-use folio_core::add_with_cap;
-use folio_core::{Item, ItemType, Kind, OverflowStrategy, Status};
+use folio_core::{ItemType, Kind, OverflowStrategy, Status};
 use folio_storage::{
     append_to_archive, get_archive_path, get_inbox_path, load_config, load_items_from_file,
     save_config, save_inbox,
@@ -219,12 +217,7 @@ async fn handle_set_status_command(id: usize, status_str: &str) -> Result<(), Cl
                 message: e.to_string(),
             })?;
 
-            match add_with_cap(
-                inbox_items,
-                item_to_move.clone(),
-                config.max_items as usize,
-                config.archive_on_overflow,
-            ) {
+            match folio_core::add_item_to_inbox(inbox_items, item_to_move.clone(), &config) {
                 Ok((new_inbox, to_archive)) => {
                     inbox_items = new_inbox;
 
@@ -515,31 +508,14 @@ async fn handle_add_command(
     let inbox_path = get_inbox_path()?;
     let inbox_items = load_items_from_file(&inbox_path)?;
 
-    let parsed_type = match item_type {
-        Some(t) => ItemType::from_str(t).unwrap_or(ItemType::BlogPost),
-        None => ItemType::BlogPost,
-    };
-
-    let parsed_kind = match kind {
-        Some(k) => Kind::from_str(k).unwrap_or(Kind::Normal),
-        None => Kind::Normal,
-    };
-
-    let new_item = Item {
-        name: name.clone().unwrap_or_else(|| "Untitled".to_string()),
-        item_type: parsed_type,
-        status: Status::Todo,
-        author: author.clone().unwrap_or_default(),
-        link: link.clone().unwrap_or_default(),
-        added_at: Utc::now(),
-        started_at: None,
-        finished_at: None,
-        note: note.clone().unwrap_or_default(),
-        kind: parsed_kind,
-        version: 1,
-    };
-
-    new_item.validate()?;
+    let new_item = folio_core::create_item(
+        name.clone().unwrap_or_else(|| "Untitled".to_string()),
+        item_type.clone(),
+        author.clone(),
+        link.clone(),
+        note.clone(),
+        kind.clone(),
+    )?;
 
     if matches!(new_item.kind, Kind::Reference) {
         append_to_archive(&new_item)?;
@@ -547,8 +523,7 @@ async fn handle_add_command(
         return Ok(());
     }
 
-    let strategy = config.archive_on_overflow.clone();
-    match add_with_cap(inbox_items, new_item, config.max_items as usize, strategy) {
+    match folio_core::add_item_to_inbox(inbox_items, new_item, &config) {
         Ok((new_inbox, to_archive)) => {
             let has_archived_items = !to_archive.is_empty();
 

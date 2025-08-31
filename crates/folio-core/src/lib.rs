@@ -1,5 +1,6 @@
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
+use std::str::FromStr;
 use strum::EnumString;
 
 mod error;
@@ -88,4 +89,62 @@ impl Item {
         }
         Ok(())
     }
+}
+
+pub fn create_item(
+    name: String,
+    item_type: Option<String>,
+    author: Option<String>,
+    link: Option<String>,
+    note: Option<String>,
+    kind: Option<String>,
+) -> Result<Item, CoreError> {
+    if name.is_empty() {
+        return Err(CoreError::ValidationError(
+            "Name cannot be empty".to_string(),
+        ));
+    }
+
+    let parsed_type = match item_type.as_deref() {
+        Some(t) => ItemType::from_str(t).unwrap_or(ItemType::BlogPost),
+        None => ItemType::BlogPost,
+    };
+
+    let parsed_kind = match kind.as_deref() {
+        Some(k) => Kind::from_str(k).unwrap_or(Kind::Normal),
+        None => Kind::Normal,
+    };
+
+    let item = Item {
+        name,
+        item_type: parsed_type,
+        status: Status::Todo,
+        author: author.unwrap_or_default(),
+        link: link.unwrap_or_default(),
+        added_at: Utc::now(),
+        started_at: None,
+        finished_at: None,
+        note: note.unwrap_or_default(),
+        kind: parsed_kind,
+        version: 1,
+    };
+
+    item.validate()?;
+    Ok(item)
+}
+
+pub fn add_item_to_inbox(
+    inbox: Vec<Item>,
+    new_item: Item,
+    config: &Config,
+) -> Result<(Vec<Item>, Vec<Item>), CoreError> {
+    new_item.validate()?;
+
+    add_with_cap(
+        inbox,
+        new_item,
+        config.max_items as usize,
+        config.archive_on_overflow.clone(),
+    )
+    .map_err(|_| CoreError::InboxFull)
 }
