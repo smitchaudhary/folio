@@ -7,7 +7,7 @@ use crate::terminal::{restore_terminal, setup_terminal};
 use crate::widgets::ItemsTable;
 use crossterm::event::{KeyCode, KeyEvent};
 use folio_core::{Item, OverflowStrategy};
-use folio_storage::load_config;
+use folio_storage::ConfigManager;
 use ratatui::widgets::TableState;
 use std::str::FromStr;
 use std::time::{Duration, Instant};
@@ -303,7 +303,8 @@ impl App {
             }
             KeyCode::Char('C') => {
                 self.show_config_dialog = true;
-                if let Ok(config) = load_config() {
+                if let Ok(config_manager) = ConfigManager::new() {
+                    let config = config_manager.get();
                     self.config_max_items_input = config.max_items.to_string();
                     self.config_overflow_strategy = match config.archive_on_overflow {
                         OverflowStrategy::Abort => 0,
@@ -362,8 +363,9 @@ impl App {
     }
 
     fn check_cap_before_add(&mut self) {
-        match load_config() {
-            Ok(config) => {
+        match ConfigManager::new() {
+            Ok(config_manager) => {
+                let config = config_manager.get();
                 if self.state.inbox_items.len() >= config.max_items as usize {
                     match config.archive_on_overflow {
                         OverflowStrategy::Abort => {
@@ -417,18 +419,25 @@ impl App {
                         _ => OverflowStrategy::Abort,
                     };
 
-                    let mut config = load_config().unwrap_or_default();
-
-                    config.max_items = max_items;
-                    config.archive_on_overflow = strategy;
-
-                    match folio_storage::save_config(&config) {
-                        Ok(_) => {
-                            self.show_status_message("Config saved successfully".to_string());
-                            self.show_config_dialog = false;
+                    match ConfigManager::new() {
+                        Ok(mut config_manager) => {
+                            match config_manager.update(|config| {
+                                config.max_items = max_items;
+                                config.archive_on_overflow = strategy;
+                            }) {
+                                Ok(_) => {
+                                    self.show_status_message(
+                                        "Config saved successfully".to_string(),
+                                    );
+                                    self.show_config_dialog = false;
+                                }
+                                Err(_) => {
+                                    self.show_status_message("Failed to save config".to_string());
+                                }
+                            }
                         }
                         Err(_) => {
-                            self.show_status_message("Failed to save config".to_string());
+                            self.show_status_message("Failed to load config".to_string());
                         }
                     }
                 } else {
@@ -526,12 +535,13 @@ impl App {
             Err(_) => return false,
         };
 
-        match load_config() {
-            Ok(config) => {
+        match ConfigManager::new() {
+            Ok(config_manager) => {
+                let config = config_manager.get();
                 match folio_core::add_item_to_inbox(
                     self.state.inbox_items.clone(),
                     new_item,
-                    &config,
+                    config,
                 ) {
                     Ok((new_inbox, to_archive)) => {
                         self.state.inbox_items = new_inbox;

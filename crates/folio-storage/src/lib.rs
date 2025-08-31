@@ -175,3 +175,30 @@ pub fn save_config(config: &Config) -> StorageResult<()> {
         .map_err(|_| StorageError::FileWrite { path: config_path })?;
     Ok(())
 }
+
+pub struct ConfigManager {
+    config: Config,
+}
+
+impl ConfigManager {
+    pub fn new() -> StorageResult<Self> {
+        let config = load_config()?;
+        Ok(Self { config })
+    }
+
+    pub fn get(&self) -> &Config {
+        &self.config
+    }
+
+    pub fn save(&self) -> StorageResult<()> {
+        save_config(&self.config)
+    }
+
+    pub fn update<F>(&mut self, updater: F) -> StorageResult<()>
+    where
+        F: FnOnce(&mut Config),
+    {
+        updater(&mut self.config);
+        self.save()
+    }
+}

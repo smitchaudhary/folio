@@ -94,11 +94,12 @@ impl AppState {
                 if item_index < self.archive_items.len() {
                     let item_to_move = self.archive_items.remove(item_index);
 
-                    if let Ok(config) = folio_storage::load_config() {
+                    if let Ok(config_manager) = folio_storage::ConfigManager::new() {
+                        let config = config_manager.get();
                         match folio_core::add_item_to_inbox(
                             self.inbox_items.clone(),
                             item_to_move.clone(),
-                            &config,
+                            config,
                         ) {
                             Ok((new_inbox, to_archive)) => {
                                 self.inbox_items = new_inbox;
@@ -145,11 +146,12 @@ impl AppState {
                 if item_index < self.archive_items.len() {
                     let item_to_move = self.archive_items.remove(item_index);
 
-                    if let Ok(config) = folio_storage::load_config() {
+                    if let Ok(config_manager) = folio_storage::ConfigManager::new() {
+                        let config = config_manager.get();
                         match folio_core::add_item_to_inbox(
                             self.inbox_items.clone(),
                             item_to_move.clone(),
-                            &config,
+                            config,
                         ) {
                             Ok((new_inbox, to_archive)) => {
                                 self.inbox_items = new_inbox;

@@ -3,8 +3,8 @@ use folio_bin::cli::{Cli, Commands, ConfigSubcommands};
 use folio_bin::error::{CliError, print_error};
 use folio_core::{ItemType, Kind, OverflowStrategy, Status};
 use folio_storage::{
-    append_to_archive, get_archive_path, get_inbox_path, load_config, load_items_from_file,
-    save_config, save_inbox,
+    ConfigManager, append_to_archive, get_archive_path, get_inbox_path, load_items_from_file,
+    save_inbox,
 };
 use folio_tui;
 use serde_json;
@@ -28,6 +28,10 @@ fn main() {
 async fn run() -> Result<(), CliError> {
     let cli = Cli::parse();
 
+    let config_manager = ConfigManager::new().map_err(|e| CliError::ConfigError {
+        message: e.to_string(),
+    })?;
+
     match &cli.command {
         Some(command) => match command {
             Commands::Add {
@@ -38,13 +42,13 @@ async fn run() -> Result<(), CliError> {
                 note,
                 kind,
             } => {
-                handle_add_command(name, r#type, author, link, note, kind).await?;
+                handle_add_command(&config_manager, name, r#type, author, link, note, kind).await?;
             }
             Commands::List { status, r#type } => {
                 handle_list_command(status.as_deref(), r#type.as_deref()).await?;
             }
             Commands::SetStatus { id, status } => {
-                handle_set_status_command(*id, status).await?;
+                handle_set_status_command(&config_manager, *id, status).await?;
             }
             Commands::Edit { id } => {
                 handle_edit_command(*id).await?;
@@ -129,7 +133,11 @@ async fn handle_list_command(
     Ok(())
 }
 
-async fn handle_set_status_command(id: usize, status_str: &str) -> Result<(), CliError> {
+async fn handle_set_status_command(
+    config_manager: &ConfigManager,
+    id: usize,
+    status_str: &str,
+) -> Result<(), CliError> {
     let inbox_path = get_inbox_path()?;
     let archive_path = get_archive_path()?;
 
@@ -169,11 +177,9 @@ async fn handle_set_status_command(id: usize, status_str: &str) -> Result<(), Cl
         if result.should_move_to_inbox {
             let item_to_move = archive_items.remove(item_index);
 
-            let config = load_config().map_err(|e| CliError::ConfigError {
-                message: e.to_string(),
-            })?;
+            let config = config_manager.get();
 
-            match folio_core::add_item_to_inbox(inbox_items, item_to_move.clone(), &config) {
+            match folio_core::add_item_to_inbox(inbox_items, item_to_move.clone(), config) {
                 Ok((new_inbox, to_archive)) => {
                     inbox_items = new_inbox;
 
@@ -433,6 +439,7 @@ async fn prompt_for_input(field_name: &str) -> Result<String, CliError> {
 }
 
 async fn handle_add_command(
+    config_manager: &ConfigManager,
     name: &Option<String>,
     item_type: &Option<String>,
     author: &Option<String>,
@@ -445,9 +452,7 @@ async fn handle_add_command(
         return Ok(());
     }
 
-    let config = load_config().map_err(|e| CliError::ConfigError {
-        message: e.to_string(),
-    })?;
+    let config = config_manager.get();
 
     let inbox_path = get_inbox_path()?;
     let inbox_items = load_items_from_file(&inbox_path)?;
@@ -467,7 +472,7 @@ async fn handle_add_command(
         return Ok(());
     }
 
-    match folio_core::add_item_to_inbox(inbox_items, new_item, &config) {
+    match folio_core::add_item_to_inbox(inbox_items, new_item, config) {
         Ok((new_inbox, to_archive)) => {
             let has_archived_items = !to_archive.is_empty();
 
@@ -544,17 +549,17 @@ async fn handle_add_command(
 async fn handle_config_command(subcommand: &ConfigSubcommands) -> Result<(), CliError> {
     match subcommand {
         ConfigSubcommands::List => {
-            let config = load_config().map_err(|e| CliError::ConfigError {
+            let config_manager = ConfigManager::new().map_err(|e| CliError::ConfigError {
                 message: e.to_string(),
             })?;
-            let json = serde_json::to_string_pretty(&config)?;
+            let json = serde_json::to_string_pretty(config_manager.get())?;
             println!("{}", json);
         }
         ConfigSubcommands::Get { key } => {
-            let config = load_config().map_err(|e| CliError::ConfigError {
+            let config_manager = ConfigManager::new().map_err(|e| CliError::ConfigError {
                 message: e.to_string(),
             })?;
-            let config_value = serde_json::to_value(&config)?;
+            let config_value = serde_json::to_value(config_manager.get())?;
 
             match key.as_str() {
                 "max_items" => println!("{}", config_value["max_items"]),
@@ -566,44 +571,64 @@ async fn handle_config_command(subcommand: &ConfigSubcommands) -> Result<(), Cli
             }
         }
         ConfigSubcommands::Set { key, value } => {
-            let mut config = load_config().map_err(|e| CliError::ConfigError {
+            let mut config_manager = ConfigManager::new().map_err(|e| CliError::ConfigError {
                 message: e.to_string(),
             })?;
 
+            config_manager
+                .update(|config| match key.as_str() {
+                    "max_items" => {
+                        if let Ok(val) = value.parse::<u32>() {
+                            config.max_items = val;
+                        }
+                    }
+                    "archive_on_overflow" => match value.as_str() {
+                        "abort" => config.archive_on_overflow = OverflowStrategy::Abort,
+                        "todo" => config.archive_on_overflow = OverflowStrategy::Todo,
+                        "any" => config.archive_on_overflow = OverflowStrategy::Any,
+                        _ => {}
+                    },
+                    _ => {}
+                })
+                .map_err(|e| CliError::ConfigError {
+                    message: e.to_string(),
+                })?;
+
             match key.as_str() {
-                "max_items" => match value.parse::<u32>() {
-                    Ok(val) => config.max_items = val,
-                    Err(_) => {
+                "max_items" => {
+                    if value.parse::<u32>().is_err() {
                         return Err(CliError::InvalidMaxItems {
                             value: value.clone(),
                         });
                     }
-                },
-                "archive_on_overflow" => match value.as_str() {
-                    "abort" => config.archive_on_overflow = OverflowStrategy::Abort,
-                    "todo" => config.archive_on_overflow = OverflowStrategy::Todo,
-                    "any" => config.archive_on_overflow = OverflowStrategy::Any,
-                    _ => {
+                }
+                "archive_on_overflow" => {
+                    if !matches!(value.as_str(), "abort" | "todo" | "any") {
                         return Err(CliError::InvalidOverflowStrategy {
                             value: value.to_string(),
                         });
                     }
-                },
+                }
                 _ => {
                     return Err(CliError::UnknownConfigKey { key: key.clone() });
                 }
             }
 
-            save_config(&config).map_err(|e| CliError::ConfigError {
-                message: e.to_string(),
-            })?;
             println!("Config updated successfully");
         }
         ConfigSubcommands::Reset => {
-            let config = folio_core::Config::default();
-            save_config(&config).map_err(|e| CliError::ConfigError {
+            let mut config_manager = ConfigManager::new().map_err(|e| CliError::ConfigError {
                 message: e.to_string(),
             })?;
+
+            config_manager
+                .update(|config| {
+                    *config = folio_core::Config::default();
+                })
+                .map_err(|e| CliError::ConfigError {
+                    message: e.to_string(),
+                })?;
+
             println!("Config reset to default values");
         }
     }
