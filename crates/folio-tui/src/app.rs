@@ -1,4 +1,3 @@
-use crate::data::{load_archive_items, load_inbox_items, save_archive_items, save_inbox_items};
 use crate::error::TuiResult;
 use crate::event::{AppEvent, EventHandler};
 use crate::forms::{FormType, ItemForm};
@@ -7,7 +6,7 @@ use crate::terminal::{restore_terminal, setup_terminal};
 use crate::widgets::ItemsTable;
 use crossterm::event::{KeyCode, KeyEvent};
 use folio_core::{Item, OverflowStrategy};
-use folio_storage::ConfigManager;
+use folio_storage::{ConfigManager, save_inbox, save_archive, load_items_from_file, get_inbox_path, get_archive_path};
 use ratatui::widgets::TableState;
 use std::str::FromStr;
 use std::time::{Duration, Instant};
@@ -64,8 +63,8 @@ impl App {
     }
 
     pub async fn load_data(&mut self) -> TuiResult<()> {
-        let inbox_items = load_inbox_items().await?;
-        let archive_items = load_archive_items().await?;
+        let inbox_items = load_items_from_file(get_inbox_path()?)?;
+        let archive_items = load_items_from_file(get_archive_path()?)?;
 
         self.state.load_inbox_items(inbox_items);
         self.state.load_archive_items(archive_items);
@@ -74,8 +73,8 @@ impl App {
     }
 
     pub async fn save_data(&mut self) -> TuiResult<()> {
-        save_inbox_items(self.state.get_inbox_items()).await?;
-        save_archive_items(self.state.get_archive_items()).await?;
+        save_inbox(self.state.get_inbox_items())?;
+        save_archive(self.state.get_archive_items())?;
         self.show_status_message("Saved".to_string());
         Ok(())
     }
