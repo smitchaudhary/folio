@@ -32,6 +32,9 @@ pub enum CliError {
 
     #[error("Configuration error: {message}")]
     ConfigError { message: String },
+
+    #[error("Storage error: {0}")]
+    Storage(#[from] folio_storage::StorageError),
 }
 
 impl From<Box<dyn std::error::Error>> for CliError {

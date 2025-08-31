@@ -5,8 +5,11 @@ use std::io::{BufRead, BufReader, Read, Write};
 use std::path::{Path, PathBuf};
 
 pub mod fs_atomic;
+pub mod error;
 
-pub fn deserialize_jsonl_from_string(jsonl_str: &str) -> Result<Vec<Item>, serde_json::Error> {
+pub use error::{StorageError, StorageResult};
+
+pub fn deserialize_jsonl_from_string(jsonl_str: &str) -> StorageResult<Vec<Item>> {
     let mut items = Vec::new();
 
     for line in jsonl_str.lines() {
@@ -14,7 +17,8 @@ pub fn deserialize_jsonl_from_string(jsonl_str: &str) -> Result<Vec<Item>, serde
             continue;
         }
 
-        let item: Item = serde_json::from_str(line)?;
+        let item: Item = serde_json::from_str(line)
+            .map_err(|_| StorageError::JsonlParse)?;
         items.push(item);
     }
 
@@ -23,7 +27,7 @@ pub fn deserialize_jsonl_from_string(jsonl_str: &str) -> Result<Vec<Item>, serde
 
 pub fn deserialize_jsonl_from_reader<R: Read>(
     reader: R,
-) -> Result<Vec<Item>, Box<dyn std::error::Error>> {
+) -> StorageResult<Vec<Item>> {
     let buf_reader = BufReader::new(reader);
     let mut items = Vec::new();
 
@@ -34,7 +38,8 @@ pub fn deserialize_jsonl_from_reader<R: Read>(
             continue;
         }
 
-        let item: Item = serde_json::from_str(&line)?;
+        let item: Item = serde_json::from_str(&line)
+            .map_err(|_| StorageError::JsonlParse)?;
         items.push(item);
     }
 
@@ -43,21 +48,29 @@ pub fn deserialize_jsonl_from_reader<R: Read>(
 
 pub fn load_items_from_file<P: AsRef<Path>>(
     path: P,
-) -> Result<Vec<Item>, Box<dyn std::error::Error>> {
-    match File::open(path) {
+) -> StorageResult<Vec<Item>> {
+    let path_ref = path.as_ref();
+    match File::open(path_ref) {
         Ok(file) => {
             let items = deserialize_jsonl_from_reader(file)?;
             Ok(items)
         }
-        Err(_) => Ok(vec![]),
+        Err(ref e) if e.kind() == std::io::ErrorKind::NotFound => {
+            // File doesn't exist yet, return empty vec
+            Ok(vec![])
+        }
+        Err(_) => Err(StorageError::FileRead { 
+            path: path_ref.to_path_buf() 
+        }),
     }
 }
 
-pub fn serialize_items_to_jsonl(items: &[Item]) -> Result<String, serde_json::Error> {
+pub fn serialize_items_to_jsonl(items: &[Item]) -> StorageResult<String> {
     let mut jsonl = String::new();
 
     for item in items {
-        let line = serde_json::to_string(item)?;
+        let line = serde_json::to_string(item)
+            .map_err(|_| StorageError::JsonSerialization)?;
         jsonl.push_str(&line);
         jsonl.push('\n');
     }
@@ -65,85 +78,100 @@ pub fn serialize_items_to_jsonl(items: &[Item]) -> Result<String, serde_json::Er
     Ok(jsonl)
 }
 
-pub fn ensure_folio_dir() -> Result<(), Box<dyn std::error::Error>> {
+pub fn ensure_folio_dir() -> StorageResult<()> {
     let folio_dir = get_folio_dir()?;
 
     if !folio_dir.exists() {
-        fs::create_dir_all(&folio_dir)?;
+        fs::create_dir_all(&folio_dir)
+            .map_err(|_| StorageError::DirectoryCreation { 
+                path: folio_dir.clone() 
+            })?;
     }
 
     Ok(())
 }
 
-pub fn get_folio_dir() -> Result<PathBuf, Box<dyn std::error::Error>> {
+pub fn get_folio_dir() -> StorageResult<PathBuf> {
     let folio_dir = dirs::home_dir()
-        .ok_or("Could not determine home directory")?
+        .ok_or(StorageError::HomeDirectoryNotFound)?
         .join(".folio");
 
     Ok(folio_dir)
 }
 
-pub fn get_inbox_path() -> Result<PathBuf, Box<dyn std::error::Error>> {
+pub fn get_inbox_path() -> StorageResult<PathBuf> {
     let inbox_path = get_folio_dir()?.join("inbox.jsonl");
     Ok(inbox_path)
 }
 
-pub fn get_archive_path() -> Result<PathBuf, Box<dyn std::error::Error>> {
+pub fn get_archive_path() -> StorageResult<PathBuf> {
     let archive_path = get_folio_dir()?.join("archive.jsonl");
     Ok(archive_path)
 }
 
-pub fn get_config_path() -> Result<PathBuf, Box<dyn std::error::Error>> {
+pub fn get_config_path() -> StorageResult<PathBuf> {
     let config_path = get_folio_dir()?.join("config.json");
     Ok(config_path)
 }
 
-fn save_items(items: &[Item], path: PathBuf) -> Result<(), Box<dyn std::error::Error>> {
+fn save_items(items: &[Item], path: PathBuf) -> StorageResult<()> {
     let jsonl = serialize_items_to_jsonl(items)?;
-    fs_atomic::atomic_write(path, jsonl.as_bytes())?;
+    fs_atomic::atomic_write(&path, jsonl.as_bytes())
+        .map_err(|_| StorageError::FileWrite { path })?;
     Ok(())
 }
 
-pub fn save_inbox(items: &[Item]) -> Result<(), Box<dyn std::error::Error>> {
+pub fn save_inbox(items: &[Item]) -> StorageResult<()> {
     ensure_folio_dir()?;
     save_items(items, get_inbox_path()?)
 }
 
-pub fn save_archive(items: &[Item]) -> Result<(), Box<dyn std::error::Error>> {
+pub fn save_archive(items: &[Item]) -> StorageResult<()> {
     ensure_folio_dir()?;
     save_items(items, get_archive_path()?)
 }
 
-pub fn append_to_archive(item: &Item) -> Result<(), Box<dyn std::error::Error>> {
+pub fn append_to_archive(item: &Item) -> StorageResult<()> {
     ensure_folio_dir()?;
     let archive_path = get_archive_path()?;
-    let json_line = serde_json::to_string(item)?;
+    let json_line = serde_json::to_string(item)
+        .map_err(|_| StorageError::JsonSerialization)?;
 
     let mut file = OpenOptions::new()
         .create(true)
         .append(true)
-        .open(archive_path)?;
+        .open(&archive_path)
+        .map_err(|_| StorageError::FileWrite { 
+            path: archive_path.clone() 
+        })?;
 
-    writeln!(file, "{}", json_line)?;
+    writeln!(file, "{}", json_line)
+        .map_err(|_| StorageError::FileWrite { path: archive_path })?;
     Ok(())
 }
 
-pub fn load_config() -> Result<Config, Box<dyn std::error::Error>> {
+pub fn load_config() -> StorageResult<Config> {
     let config_path = get_config_path()?;
 
     if config_path.exists() {
-        let file = File::open(config_path)?;
-        let config: Config = serde_json::from_reader(file)?;
+        let file = File::open(&config_path)
+            .map_err(|_| StorageError::FileRead { 
+                path: config_path.clone() 
+            })?;
+        let config: Config = serde_json::from_reader(file)
+            .map_err(|_| StorageError::JsonDeserialization)?;
         Ok(config)
     } else {
         Ok(Config::default())
     }
 }
 
-pub fn save_config(config: &Config) -> Result<(), Box<dyn std::error::Error>> {
+pub fn save_config(config: &Config) -> StorageResult<()> {
     ensure_folio_dir()?;
     let config_path = get_config_path()?;
-    let json = serde_json::to_string_pretty(config)?;
-    fs_atomic::atomic_write(config_path, json.as_bytes())?;
+    let json = serde_json::to_string_pretty(config)
+        .map_err(|_| StorageError::JsonSerialization)?;
+    fs_atomic::atomic_write(&config_path, json.as_bytes())
+        .map_err(|_| StorageError::FileWrite { path: config_path })?;
     Ok(())
 }
