@@ -8,6 +8,10 @@ I bookmark/save plenty of articles/blog posts etc and that floods my to read lis
 
 So now, I made a small tool where I can only have a limited number of items in my to read list. Anything more that I want to add? Either read something that or delete something. Simple as. Or of course watch/listen for videos/podcast respectively.
 
+## Screenshot
+
+![Folio Screenshot](images/Screenshot.jpg)
+
 Hopefully this will also make me deliberate in what I add in the first place.
 
 ## Install
@@ -18,7 +22,6 @@ Clone it and build it. And it is yours. Do as you see fit.
 git clone https://github.com/smitchaudhary/folio.git
 cd folio
 
-cargo build --release
 cargo install --path crates/folio-bin
 ```
 
