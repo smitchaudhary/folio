@@ -10,7 +10,7 @@ So now, I made a small tool where I can only have a limited number of items in m
 
 ## Screenshot
 
-![Folio Screenshot](images/Screenshot.jpg)
+![Folio Screenshot](images/Screenshot.png)
 
 Hopefully this will also make me deliberate in what I add in the first place.
 

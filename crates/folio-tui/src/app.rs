@@ -6,7 +6,9 @@ use crate::terminal::{restore_terminal, setup_terminal};
 use crate::widgets::ItemsTable;
 use crossterm::event::{KeyCode, KeyEvent};
 use folio_core::{Item, OverflowStrategy};
-use folio_storage::{ConfigManager, save_inbox, save_archive, load_items_from_file, get_inbox_path, get_archive_path};
+use folio_storage::{
+    ConfigManager, get_archive_path, get_inbox_path, load_items_from_file, save_archive, save_inbox,
+};
 use ratatui::widgets::TableState;
 use std::str::FromStr;
 use std::time::{Duration, Instant};
@@ -851,7 +853,8 @@ impl App {
 
         let paragraph = ratatui::widgets::Paragraph::new(content_lines)
             .block(block)
-            .alignment(ratatui::layout::Alignment::Left);
+            .alignment(ratatui::layout::Alignment::Left)
+            .wrap(ratatui::widgets::Wrap { trim: true });
 
         frame.render_widget(paragraph, popup_area);
     }
