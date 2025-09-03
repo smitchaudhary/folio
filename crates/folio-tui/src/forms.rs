@@ -321,7 +321,8 @@ impl ItemForm {
                 let field_area = inner_area[i];
 
                 let label = Paragraph::new(format!("{}:", field.label))
-                    .style(Style::default().fg(Color::Cyan).bold());
+                    .style(Style::default().fg(Color::Cyan).bold())
+                    .wrap(ratatui::widgets::Wrap { trim: true });
 
                 let value_style = if field.is_focused {
                     Style::default().fg(Color::Black).bg(Color::Cyan).bold()
@@ -340,7 +341,9 @@ impl ItemForm {
                     }
                 };
 
-                let value = Paragraph::new(value_text).style(value_style);
+                let value = Paragraph::new(value_text)
+                    .style(value_style)
+                    .wrap(ratatui::widgets::Wrap { trim: true });
 
                 let field_layout = Layout::default()
                     .direction(Direction::Horizontal)

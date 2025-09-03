@@ -774,7 +774,8 @@ impl App {
 
         let paragraph = ratatui::widgets::Paragraph::new(text)
             .block(block)
-            .alignment(ratatui::layout::Alignment::Center);
+            .alignment(ratatui::layout::Alignment::Center)
+            .wrap(ratatui::widgets::Wrap { trim: true });
 
         frame.render_widget(paragraph, popup_area);
     }
@@ -822,7 +823,8 @@ impl App {
 
         let paragraph = ratatui::widgets::Paragraph::new(help_text)
             .block(block)
-            .alignment(ratatui::layout::Alignment::Left);
+            .alignment(ratatui::layout::Alignment::Left)
+            .wrap(ratatui::widgets::Wrap { trim: true });
 
         frame.render_widget(paragraph, popup_area);
     }
@@ -883,7 +885,8 @@ impl App {
 
         let paragraph = ratatui::widgets::Paragraph::new(text)
             .block(block)
-            .alignment(ratatui::layout::Alignment::Center);
+            .alignment(ratatui::layout::Alignment::Center)
+            .wrap(ratatui::widgets::Wrap { trim: true });
 
         frame.render_widget(paragraph, popup_area);
     }
@@ -929,7 +932,8 @@ impl App {
 
         let paragraph = ratatui::widgets::Paragraph::new(text)
             .block(block)
-            .alignment(ratatui::layout::Alignment::Left);
+            .alignment(ratatui::layout::Alignment::Left)
+            .wrap(ratatui::widgets::Wrap { trim: true });
 
         frame.render_widget(paragraph, popup_area);
     }
@@ -957,11 +961,13 @@ impl App {
             format!("{} | View: {} | Press ? for help", message_text, view_text)
         };
 
-        let paragraph = ratatui::widgets::Paragraph::new(status_text).style(
-            ratatui::style::Style::default()
-                .fg(ratatui::style::Color::White)
-                .bg(ratatui::style::Color::Black),
-        );
+        let paragraph = ratatui::widgets::Paragraph::new(status_text)
+            .style(
+                ratatui::style::Style::default()
+                    .fg(ratatui::style::Color::White)
+                    .bg(ratatui::style::Color::Black),
+            )
+            .wrap(ratatui::widgets::Wrap { trim: true });
 
         frame.render_widget(paragraph, area);
     }
@@ -988,7 +994,8 @@ impl App {
 
         let paragraph = ratatui::widgets::Paragraph::new(text)
             .block(block)
-            .alignment(ratatui::layout::Alignment::Left);
+            .alignment(ratatui::layout::Alignment::Left)
+            .wrap(ratatui::widgets::Wrap { trim: true });
 
         frame.render_widget(paragraph, input_area);
     }
