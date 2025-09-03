@@ -283,7 +283,7 @@ impl ItemForm {
             return;
         }
 
-        let area = frame.size();
+        let area = frame.area();
         let popup_area = centered_rect(60, 90, area);
 
         frame.render_widget(Clear, popup_area);

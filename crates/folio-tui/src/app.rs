@@ -686,7 +686,7 @@ impl App {
                         ratatui::layout::Constraint::Min(3),
                         ratatui::layout::Constraint::Length(1),
                     ])
-                    .split(f.size());
+                    .split(f.area());
 
                 ItemsTable::render(f, &self.state, chunks[0], &self.table_state);
                 self.add_form.render(f);
@@ -753,7 +753,7 @@ impl App {
     }
 
     fn render_delete_confirmation(frame: &mut ratatui::Frame) {
-        let area = frame.size();
+        let area = frame.area();
         let popup_area = ratatui::layout::Rect {
             x: area.width / 2 - 20,
             y: area.height / 2 - 2,
@@ -781,7 +781,7 @@ impl App {
     }
 
     fn render_help_dialog(frame: &mut ratatui::Frame) {
-        let area = frame.size();
+        let area = frame.area();
         let popup_area = ratatui::layout::Rect {
             x: area.width / 2 - 30,
             y: area.height / 2 - 12,
@@ -830,7 +830,7 @@ impl App {
     }
 
     fn render_cap_warning_dialog(frame: &mut ratatui::Frame, message: &str) {
-        let area = frame.size();
+        let area = frame.area();
         let popup_area = ratatui::layout::Rect {
             x: area.width / 2 - 35,
             y: area.height / 2 - 8,
@@ -862,7 +862,7 @@ impl App {
     }
 
     fn render_done_confirmation_dialog(frame: &mut ratatui::Frame) {
-        let area = frame.size();
+        let area = frame.area();
         let popup_area = ratatui::layout::Rect {
             x: area.width / 2 - 25,
             y: area.height / 2 - 3,
@@ -896,7 +896,7 @@ impl App {
         max_items_input: &str,
         overflow_strategy_index: usize,
     ) {
-        let area = frame.size();
+        let area = frame.area();
         let popup_area = ratatui::layout::Rect {
             x: area.width / 2 - 30,
             y: area.height / 2 - 8,
@@ -973,7 +973,7 @@ impl App {
     }
 
     fn render_filter_input(frame: &mut ratatui::Frame, filter_input: &str) {
-        let area = frame.size();
+        let area = frame.area();
         let input_area = ratatui::layout::Rect {
             x: 0,
             y: area.height.saturating_sub(3),

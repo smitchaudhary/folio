@@ -147,7 +147,7 @@ impl ItemsTable {
                     .title(title)
                     .border_style(border_style),
             )
-            .highlight_style(Style::default().fg(Color::Black).bg(Color::Cyan).bold())
+            .row_highlight_style(Style::default().fg(Color::Black).bg(Color::Cyan).bold())
             .highlight_symbol("▶");
 
         frame.render_stateful_widget(table, area, &mut table_state.clone());
