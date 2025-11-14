@@ -9,7 +9,9 @@ pub enum CliError {
     #[error("Invalid status '{status}'. Valid options are: todo, doing, done")]
     InvalidStatus { status: String },
 
-    #[error("Invalid item type '{item_type}'. Valid options are: article, video, blog, other")]
+    #[error(
+        "Invalid item type '{item_type}'. Valid options are: blog_post, video, podcast, news, thread, academic_paper, other"
+    )]
     InvalidItemType { item_type: String },
 
     #[error("Invalid value for max_items: {value}. Must be a number between 1 and 1000")]

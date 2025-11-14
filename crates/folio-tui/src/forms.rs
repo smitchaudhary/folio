@@ -52,7 +52,7 @@ impl ItemForm {
             "type".to_string(),
             FormField {
                 label: "Type".to_string(),
-                value: "article".to_string(),
+                value: "blog_post".to_string(),
                 is_focused: false,
                 field_type: FieldType::Dropdown {
                     options: vec![
@@ -143,7 +143,7 @@ impl ItemForm {
                         if let FieldType::Dropdown { selected, .. } = &mut field.field_type {
                             *selected = 0;
                             field.value = match field.label.as_str() {
-                                "Type" => "article".to_string(),
+                                "Type" => "blog_post".to_string(),
                                 _ => String::new(),
                             };
                         } else {
