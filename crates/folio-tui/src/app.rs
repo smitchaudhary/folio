@@ -358,25 +358,19 @@ impl App {
                     .to_string(),
                 );
             }
+            KeyCode::Char('y') => {
+                self.copy_selected_link_to_clipboard();
+            }
             KeyCode::Enter => {
                 if let Some(item) = self.state.selected_item() {
-                    if !item.link.is_empty() {
-                        // Ensure link has a protocol for better compatibility
-                        let link_to_open = if item.link.starts_with("http://")
-                            || item.link.starts_with("https://")
-                        {
-                            item.link.clone()
-                        } else {
-                            format!("https://{}", item.link)
-                        };
-
-                        match opener::open(&link_to_open) {
+                    if let Some(link_to_use) = Self::normalized_link(&item.link) {
+                        match opener::open(&link_to_use) {
                             Ok(_) => {
                                 self.show_status_message("Opening link...".to_string());
                             }
                             Err(_) => {
                                 // Try without https:// prefix if we added it
-                                if link_to_open != item.link {
+                                if link_to_use != item.link {
                                     let _ = opener::open(&item.link);
                                 }
                                 self.show_status_message("Opening link...".to_string());
@@ -386,6 +380,36 @@ impl App {
                 }
             }
             _ => {}
+        }
+    }
+
+    fn copy_selected_link_to_clipboard(&mut self) {
+        if let Some(item) = self.state.selected_item() {
+            if let Some(link_to_use) = Self::normalized_link(&item.link) {
+                match arboard::Clipboard::new() {
+                    Ok(mut clipboard) => match clipboard.set_text(&link_to_use) {
+                        Ok(_) => {
+                            self.show_status_message("Link copied to clipboard".to_string());
+                        }
+                        Err(_) => {
+                            self.show_status_message("Failed to copy link".to_string());
+                        }
+                    },
+                    Err(_) => {
+                        self.show_status_message("Clipboard not available".to_string());
+                    }
+                }
+            }
+        }
+    }
+
+    fn normalized_link(link: &str) -> Option<String> {
+        if link.is_empty() {
+            None
+        } else if link.starts_with("http://") || link.starts_with("https://") {
+            Some(link.to_string())
+        } else {
+            Some(format!("https://{}", link))
         }
     }
 
@@ -803,22 +827,23 @@ impl App {
             ratatui::text::Line::from("  Tab               Switch between Inbox/Archive"),
             ratatui::text::Line::from(""),
             ratatui::text::Line::from("Item Actions:"),
-            ratatui::text::Line::from("  Enter    Open link"),
-            ratatui::text::Line::from("  t        Set status to todo"),
-            ratatui::text::Line::from("  i        Set status to in progress"),
-            ratatui::text::Line::from("  d        Set status to done"),
-            ratatui::text::Line::from("  a        Add new item"),
-            ratatui::text::Line::from("  e        Edit item"),
-            ratatui::text::Line::from("  x        Delete item"),
-            ratatui::text::Line::from("  r        Toggle reference (Archive only)"),
+            ratatui::text::Line::from("  Enter             Open link"),
+            ratatui::text::Line::from("  y                 Copy link to clipboard"),
+            ratatui::text::Line::from("  t                 Set status to todo"),
+            ratatui::text::Line::from("  i                 Set status to in progress"),
+            ratatui::text::Line::from("  d                 Set status to done"),
+            ratatui::text::Line::from("  a                 Add new item"),
+            ratatui::text::Line::from("  e                 Edit item"),
+            ratatui::text::Line::from("  x                 Delete item"),
+            ratatui::text::Line::from("  r                 Toggle reference (Archive only)"),
             ratatui::text::Line::from(""),
             ratatui::text::Line::from("System:"),
-            ratatui::text::Line::from("  C        Configure settings"),
+            ratatui::text::Line::from("  C                 Configure settings"),
             ratatui::text::Line::from(""),
             ratatui::text::Line::from("General:"),
-            ratatui::text::Line::from("  ?        Show this help"),
-            ratatui::text::Line::from("  /        Filter items"),
-            ratatui::text::Line::from("  q/Esc    Quit"),
+            ratatui::text::Line::from("  ?                 Show this help"),
+            ratatui::text::Line::from("  /                 Filter items"),
+            ratatui::text::Line::from("  q/Esc             Quit"),
         ];
 
         let paragraph = ratatui::widgets::Paragraph::new(help_text)

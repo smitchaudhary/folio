@@ -12,6 +12,7 @@ name = "folio-tui"
 path = "src/main.rs"
 
 [dependencies]
+arboard = "3.6.1"
 chrono = { workspace = true }
 crossterm = { workspace = true }
 folio-core = { path = "../folio-core" }
