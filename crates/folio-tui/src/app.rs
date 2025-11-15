@@ -234,35 +234,35 @@ impl App {
             }
             KeyCode::Down => {
                 self.state.next_item();
-                self.table_state.select(Some(self.state.selected_index));
+                self.table_state.select(self.state.selected_table_row());
             }
             KeyCode::Up => {
                 self.state.previous_item();
-                self.table_state.select(Some(self.state.selected_index));
+                self.table_state.select(self.state.selected_table_row());
             }
             KeyCode::Char('j') => {
                 self.state.next_item();
-                self.table_state.select(Some(self.state.selected_index));
+                self.table_state.select(self.state.selected_table_row());
             }
             KeyCode::Char('k') => {
                 self.state.previous_item();
-                self.table_state.select(Some(self.state.selected_index));
+                self.table_state.select(self.state.selected_table_row());
             }
             KeyCode::PageDown => {
                 self.state.next_page(10);
-                self.table_state.select(Some(self.state.selected_index));
+                self.table_state.select(self.state.selected_table_row());
             }
             KeyCode::PageUp => {
                 self.state.previous_page(10);
-                self.table_state.select(Some(self.state.selected_index));
+                self.table_state.select(self.state.selected_table_row());
             }
             KeyCode::Home => {
                 self.state.jump_to_first();
-                self.table_state.select(Some(self.state.selected_index));
+                self.table_state.select(self.state.selected_table_row());
             }
             KeyCode::End => {
                 self.state.jump_to_last();
-                self.table_state.select(Some(self.state.selected_index));
+                self.table_state.select(self.state.selected_table_row());
             }
             KeyCode::Char('t') => match self.state.move_selected_to_todo() {
                 Ok(result) => {
@@ -348,8 +348,8 @@ impl App {
                     View::Inbox => self.state.current_view = View::Archive,
                     View::Archive => self.state.current_view = View::Inbox,
                 }
-                self.state.selected_index = 0;
-                self.table_state.select(Some(0));
+                self.state.selected_item_id = self.state.visible_items().first().map(|(id, _)| *id);
+                self.table_state.select(self.state.selected_table_row());
                 self.show_status_message(
                     match self.state.current_view {
                         View::Inbox => "Switched to Inbox",
@@ -511,31 +511,39 @@ impl App {
     }
 
     async fn delete_selected_item(&mut self) {
+        let selected_id = match self.state.selected_item_id {
+            Some(id) => id,
+            None => return,
+        };
+        let preferred_row = self.state.selected_table_row();
+
         match self.state.current_view {
             View::Inbox => {
-                if !self.state.inbox_items.is_empty()
-                    && self.state.selected_index < self.state.inbox_items.len()
+                if let Some(pos) = self
+                    .state
+                    .inbox_items
+                    .iter()
+                    .position(|item| item.id() == selected_id)
                 {
-                    self.state.inbox_items.remove(self.state.selected_index);
-                    if self.state.selected_index >= self.state.inbox_items.len()
-                        && !self.state.inbox_items.is_empty()
-                    {
-                        self.state.selected_index = self.state.inbox_items.len() - 1;
-                    }
+                    self.state.inbox_items.remove(pos);
+
+                    self.state.reselect_visible_row(preferred_row);
+
                     let _ = self.save_data().await;
                     self.show_status_message("Item deleted".to_string());
                 }
             }
             View::Archive => {
-                if !self.state.archive_items.is_empty()
-                    && self.state.selected_index < self.state.archive_items.len()
+                if let Some(pos) = self
+                    .state
+                    .archive_items
+                    .iter()
+                    .position(|item| item.id() == selected_id)
                 {
-                    self.state.archive_items.remove(self.state.selected_index);
-                    if self.state.selected_index >= self.state.archive_items.len()
-                        && !self.state.archive_items.is_empty()
-                    {
-                        self.state.selected_index = self.state.archive_items.len() - 1;
-                    }
+                    self.state.archive_items.remove(pos);
+
+                    self.state.reselect_visible_row(preferred_row);
+
                     let _ = self.save_data().await;
                     self.show_status_message("Item deleted".to_string());
                 }
@@ -696,7 +704,7 @@ impl App {
         let mut events = EventHandler::new(Duration::from_millis(250));
 
         if !self.state.current_items().is_empty() {
-            self.table_state.select(Some(0));
+            self.table_state.select(self.state.selected_table_row());
         }
 
         if self.start_with_add_form {

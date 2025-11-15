@@ -142,6 +142,10 @@ impl Status {
 }
 
 impl Item {
+    pub fn id(&self) -> usize {
+        self.added_at.timestamp_micros() as usize
+    }
+
     pub fn validate(&self) -> Result<(), CoreError> {
         if self.name.is_empty() {
             return Err(CoreError::ValidationError(

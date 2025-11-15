@@ -40,83 +40,84 @@ impl ItemsTable {
             }
         };
 
-        let items = app_state.current_items();
-        let filtered_indices = app_state.filtered_items();
+        let visible_items = app_state.visible_items();
 
-        let rows = filtered_indices.iter().map(|&i| {
-            let item = &items[i];
-            match app_state.current_view {
-                View::Inbox => {
-                    let status_char = item.status.display_emoji();
+        let rows = visible_items
+            .iter()
+            .enumerate()
+            .map(
+                |(display_index, (_id, item))| match app_state.current_view {
+                    View::Inbox => {
+                        let status_char = item.status.display_emoji();
 
-                    let status_style = match item.status {
-                        folio_core::Status::Todo => Style::default().fg(Color::Gray),
-                        folio_core::Status::Doing => Style::default().fg(Color::Yellow).bold(),
-                        folio_core::Status::Done => Style::default().fg(Color::Green).bold(),
-                    };
+                        let status_style = match item.status {
+                            folio_core::Status::Todo => Style::default().fg(Color::Gray),
+                            folio_core::Status::Doing => Style::default().fg(Color::Yellow).bold(),
+                            folio_core::Status::Done => Style::default().fg(Color::Green).bold(),
+                        };
 
-                    let item_type = item.item_type.abbreviation();
+                        let item_type = item.item_type.abbreviation();
 
-                    let added_date = item.added_at.format("%Y-%m-%d").to_string();
+                        let added_date = item.added_at.format("%Y-%m-%d").to_string();
 
-                    let link_display = if item.link.len() > 25 {
-                        format!("{}...", &item.link[..22])
-                    } else {
-                        item.link.clone()
-                    };
+                        let link_display = if item.link.len() > 25 {
+                            format!("{}...", &item.link[..22])
+                        } else {
+                            item.link.clone()
+                        };
 
-                    Row::new(vec![
-                        (i + 1).to_string(),
-                        status_char.to_string(),
-                        item.name.clone(),
-                        item_type.to_string(),
-                        added_date,
-                        item.author.clone(),
-                        link_display,
-                    ])
-                    .style(status_style)
-                }
-                View::Archive => {
-                    let reference_char = item.kind.display_emoji();
+                        Row::new(vec![
+                            (display_index + 1).to_string(),
+                            status_char.to_string(),
+                            item.name.clone(),
+                            item_type.to_string(),
+                            added_date,
+                            item.author.clone(),
+                            link_display,
+                        ])
+                        .style(status_style)
+                    }
+                    View::Archive => {
+                        let reference_char = item.kind.display_emoji();
 
-                    let reference_style = match item.kind {
-                        folio_core::Kind::Normal => Style::default().fg(Color::White),
-                        folio_core::Kind::Reference => Style::default().fg(Color::Cyan).bold(),
-                    };
+                        let reference_style = match item.kind {
+                            folio_core::Kind::Normal => Style::default().fg(Color::White),
+                            folio_core::Kind::Reference => Style::default().fg(Color::Cyan).bold(),
+                        };
 
-                    let done_date = item
-                        .finished_at
-                        .as_ref()
-                        .map(|dt| dt.format("%Y-%m-%d").to_string())
-                        .unwrap_or_default();
+                        let done_date = item
+                            .finished_at
+                            .as_ref()
+                            .map(|dt| dt.format("%Y-%m-%d").to_string())
+                            .unwrap_or_default();
 
-                    let item_type = item.item_type.abbreviation();
+                        let item_type = item.item_type.abbreviation();
 
-                    let note = if item.note.is_empty() {
-                        "–".to_string()
-                    } else {
-                        item.note.clone()
-                    };
+                        let note = if item.note.is_empty() {
+                            "–".to_string()
+                        } else {
+                            item.note.clone()
+                        };
 
-                    let link_display = if item.link.len() > 20 {
-                        format!("{}...", &item.link[..17])
-                    } else {
-                        item.link.clone()
-                    };
+                        let link_display = if item.link.len() > 20 {
+                            format!("{}...", &item.link[..17])
+                        } else {
+                            item.link.clone()
+                        };
 
-                    Row::new(vec![
-                        (i + 1).to_string(),
-                        reference_char.to_string(),
-                        item.name.clone(),
-                        done_date,
-                        item_type.to_string(),
-                        note,
-                        link_display,
-                    ])
-                    .style(reference_style)
-                }
-            }
-        });
+                        Row::new(vec![
+                            (display_index + 1).to_string(),
+                            reference_char.to_string(),
+                            item.name.clone(),
+                            done_date,
+                            item_type.to_string(),
+                            note,
+                            link_display,
+                        ])
+                        .style(reference_style)
+                    }
+                },
+            );
 
         let widths = match app_state.current_view {
             View::Inbox => vec![
