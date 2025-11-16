@@ -211,9 +211,7 @@ impl AppState {
             .ok_or(CoreError::ItemNotFound)?;
 
         if pos >= items.len() - 1 {
-            return Err(CoreError::ValidationError(
-                "Already at bottom".to_string(),
-            ));
+            return Err(CoreError::ValidationError("Already at bottom".to_string()));
         }
 
         items.swap(pos, pos + 1);
@@ -339,7 +337,7 @@ impl AppState {
                     .iter()
                     .any(|item| item.id() == selected_id)
             {
-                self.reselect_visible_row(Some(0));
+                self.reselect_visible_row(previous_row);
             }
 
             Ok(result)

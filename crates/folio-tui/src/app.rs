@@ -123,6 +123,7 @@ impl App {
                                 self.show_status_message("Item archived".to_string());
                             }
                             let _ = self.save_data().await;
+                            self.table_state.select(self.state.selected_table_row());
                         }
                         Err(_) => {
                             self.show_status_message("Failed to archive item".to_string());
@@ -205,6 +206,7 @@ impl App {
                     self.filter_input_mode = false;
                     self.filter_input.clear();
                     self.state.set_filter(None);
+                    self.table_state.select(self.state.selected_table_row());
                 }
                 KeyCode::Enter => {
                     self.filter_input_mode = false;
@@ -213,6 +215,7 @@ impl App {
                     } else {
                         self.state.set_filter(Some(self.filter_input.clone()));
                     }
+                    self.table_state.select(self.state.selected_table_row());
                 }
                 KeyCode::Backspace => {
                     self.filter_input.pop();
@@ -291,6 +294,7 @@ impl App {
             KeyCode::Char('t') => match self.state.move_selected_to_todo() {
                 Ok(result) => {
                     let _ = self.save_data().await;
+                    self.table_state.select(self.state.selected_table_row());
                     if result.moved_to_inbox && !result.overflow_items.is_empty() {
                         self.show_status_message(format!(
                             "Moved to inbox. {} item(s) archived due to overflow",
@@ -312,6 +316,7 @@ impl App {
             KeyCode::Char('i') => match self.state.move_selected_to_doing() {
                 Ok(result) => {
                     let _ = self.save_data().await;
+                    self.table_state.select(self.state.selected_table_row());
                     if result.moved_to_inbox && !result.overflow_items.is_empty() {
                         self.show_status_message(format!(
                             "Moved to inbox. {} item(s) archived due to overflow",
@@ -552,6 +557,7 @@ impl App {
                     self.state.inbox_items.remove(pos);
 
                     self.state.reselect_visible_row(preferred_row);
+                    self.table_state.select(self.state.selected_table_row());
 
                     let _ = self.save_data().await;
                     self.show_status_message("Item deleted".to_string());
@@ -567,6 +573,7 @@ impl App {
                     self.state.archive_items.remove(pos);
 
                     self.state.reselect_visible_row(preferred_row);
+                    self.table_state.select(self.state.selected_table_row());
 
                     let _ = self.save_data().await;
                     self.show_status_message("Item deleted".to_string());
