@@ -248,6 +248,30 @@ impl App {
                 self.state.previous_item();
                 self.table_state.select(self.state.selected_table_row());
             }
+            KeyCode::Char('J') => {
+                match self.state.move_item_down() {
+                    Ok(_) => {
+                        self.table_state.select(self.state.selected_table_row());
+                        let _ = self.save_data().await;
+                        self.show_status_message("Item moved down".to_string());
+                    }
+                    Err(_) => {
+                        self.show_status_message("Cannot move down".to_string());
+                    }
+                }
+            }
+            KeyCode::Char('K') => {
+                match self.state.move_item_up() {
+                    Ok(_) => {
+                        self.table_state.select(self.state.selected_table_row());
+                        let _ = self.save_data().await;
+                        self.show_status_message("Item moved up".to_string());
+                    }
+                    Err(_) => {
+                        self.show_status_message("Cannot move up".to_string());
+                    }
+                }
+            }
             KeyCode::PageDown => {
                 self.state.next_page(10);
                 self.table_state.select(self.state.selected_table_row());
@@ -830,6 +854,7 @@ impl App {
         let help_text = vec![
             ratatui::text::Line::from("Navigation:"),
             ratatui::text::Line::from("  ↑/↓ or j/k        Move selection"),
+            ratatui::text::Line::from("  J/K               Move item down/up"),
             ratatui::text::Line::from("  PgUp/PgDn         Jump pages"),
             ratatui::text::Line::from("  Home/End          Jump to top/bottom"),
             ratatui::text::Line::from("  Tab               Switch between Inbox/Archive"),

@@ -184,6 +184,42 @@ impl AppState {
         self.selected_item_id = visible.last().copied();
     }
 
+    pub fn move_item_up(&mut self) -> Result<(), CoreError> {
+        let selected_id = self.selected_item_id.ok_or(CoreError::ItemNotFound)?;
+        let items = self.current_items_mut();
+
+        let pos = items
+            .iter()
+            .position(|item| item.id() == selected_id)
+            .ok_or(CoreError::ItemNotFound)?;
+
+        if pos == 0 {
+            return Err(CoreError::ValidationError("Already at top".to_string()));
+        }
+
+        items.swap(pos, pos - 1);
+        Ok(())
+    }
+
+    pub fn move_item_down(&mut self) -> Result<(), CoreError> {
+        let selected_id = self.selected_item_id.ok_or(CoreError::ItemNotFound)?;
+        let items = self.current_items_mut();
+
+        let pos = items
+            .iter()
+            .position(|item| item.id() == selected_id)
+            .ok_or(CoreError::ItemNotFound)?;
+
+        if pos >= items.len() - 1 {
+            return Err(CoreError::ValidationError(
+                "Already at bottom".to_string(),
+            ));
+        }
+
+        items.swap(pos, pos + 1);
+        Ok(())
+    }
+
     pub fn add_item_to_archive(&mut self, item: Item) {
         self.archive_items.push(item);
     }
