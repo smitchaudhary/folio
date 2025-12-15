@@ -230,7 +230,14 @@ impl App {
 
         match key_event.code {
             KeyCode::Char('q') => self.should_quit = true,
-            KeyCode::Esc => self.should_quit = true,
+            KeyCode::Esc => {
+                if self.state.filter.is_some() {
+                    self.state.set_filter(None);
+                    self.table_state.select(self.state.selected_table_row());
+                } else {
+                    self.should_quit = true;
+                }
+            }
             KeyCode::Char('/') => {
                 self.filter_input_mode = true;
                 self.filter_input.clear();
@@ -251,30 +258,26 @@ impl App {
                 self.state.previous_item();
                 self.table_state.select(self.state.selected_table_row());
             }
-            KeyCode::Char('J') => {
-                match self.state.move_item_down() {
-                    Ok(_) => {
-                        self.table_state.select(self.state.selected_table_row());
-                        let _ = self.save_data().await;
-                        self.show_status_message("Item moved down".to_string());
-                    }
-                    Err(_) => {
-                        self.show_status_message("Cannot move down".to_string());
-                    }
+            KeyCode::Char('J') => match self.state.move_item_down() {
+                Ok(_) => {
+                    self.table_state.select(self.state.selected_table_row());
+                    let _ = self.save_data().await;
+                    self.show_status_message("Item moved down".to_string());
                 }
-            }
-            KeyCode::Char('K') => {
-                match self.state.move_item_up() {
-                    Ok(_) => {
-                        self.table_state.select(self.state.selected_table_row());
-                        let _ = self.save_data().await;
-                        self.show_status_message("Item moved up".to_string());
-                    }
-                    Err(_) => {
-                        self.show_status_message("Cannot move up".to_string());
-                    }
+                Err(_) => {
+                    self.show_status_message("Cannot move down".to_string());
                 }
-            }
+            },
+            KeyCode::Char('K') => match self.state.move_item_up() {
+                Ok(_) => {
+                    self.table_state.select(self.state.selected_table_row());
+                    let _ = self.save_data().await;
+                    self.show_status_message("Item moved up".to_string());
+                }
+                Err(_) => {
+                    self.show_status_message("Cannot move up".to_string());
+                }
+            },
             KeyCode::PageDown => {
                 self.state.next_page(10);
                 self.table_state.select(self.state.selected_table_row());
