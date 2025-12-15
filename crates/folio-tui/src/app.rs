@@ -850,9 +850,9 @@ impl App {
         let area = frame.area();
         let popup_area = ratatui::layout::Rect {
             x: area.width / 2 - 30,
-            y: area.height / 2 - 12,
+            y: area.height / 2 - 14,
             width: 60.min(area.width),
-            height: 24.min(area.height),
+            height: 27.min(area.height),
         };
 
         frame.render_widget(ratatui::widgets::Clear, popup_area);
