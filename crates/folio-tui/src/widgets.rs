@@ -32,7 +32,7 @@ impl ItemsTable {
                     " Archive ".to_string()
                 };
                 (
-                    Row::new(vec!["ID", "R", "Name", "Done On", "Type", "Note", "Link"])
+                    Row::new(vec!["ID", "R", "Name", "Author", "Done On", "Type", "Note", "Link"])
                         .style(Style::default().fg(Color::White).bold()),
                     title,
                     Style::default().fg(Color::Blue).bold(),
@@ -109,6 +109,7 @@ impl ItemsTable {
                             (display_index + 1).to_string(),
                             reference_char.to_string(),
                             item.name.clone(),
+                            item.author.clone(),
                             done_date,
                             item_type.to_string(),
                             note,
@@ -132,10 +133,11 @@ impl ItemsTable {
             View::Archive => vec![
                 Constraint::Length(3),
                 Constraint::Length(2),
-                Constraint::Percentage(30),
+                Constraint::Percentage(25),
+                Constraint::Percentage(15),
                 Constraint::Length(10),
                 Constraint::Length(5),
-                Constraint::Percentage(15),
+                Constraint::Percentage(10),
                 Constraint::Percentage(20),
             ],
         };
