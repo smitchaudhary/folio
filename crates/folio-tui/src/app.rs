@@ -172,7 +172,9 @@ impl App {
                     self.add_form.toggle_visibility();
                 }
                 KeyCode::Enter => {
-                    if self.submit_add_form().await {
+                    if let Some(item_id) = self.submit_add_form().await {
+                        self.state.selected_item_id = Some(item_id);
+                        self.table_state.select(self.state.selected_table_row());
                         self.add_form.toggle_visibility();
                     }
                 }
@@ -585,14 +587,14 @@ impl App {
         }
     }
 
-    async fn submit_add_form(&mut self) -> bool {
+    async fn submit_add_form(&mut self) -> Option<usize> {
         let name = self
             .add_form
             .get_field_value("name")
             .cloned()
             .unwrap_or_default();
         if name.is_empty() {
-            return false;
+            return None;
         }
 
         let item_type = self
@@ -625,8 +627,10 @@ impl App {
             None,
         ) {
             Ok(item) => item,
-            Err(_) => return false,
+            Err(_) => return None,
         };
+
+        let item_id = new_item.id();
 
         match ConfigManager::new() {
             Ok(config_manager) => {
@@ -654,20 +658,20 @@ impl App {
                             self.show_status_message("Item added".to_string());
                         }
 
-                        true
+                        Some(item_id)
                     }
                     Err(_) => {
                         self.cap_warning_message = format!(
                             "Inbox limit ({}) reached.\n\n\
-                            Choose an action:\n\
-                            • Delete an existing item (use 'x' key to delete)\n\
-                            • Archive an item (change status to 'done' or use 'A' key)\n\
-                            • Adjust inbox size: `folio config set max_items N`\n\
-                            • Change overflow strategy: `folio config set archive_on_overflow [todo|any]`",
+                             Choose an action:\n\
+                             • Delete an existing item (use 'x' key to delete)\n\
+                             • Archive an item (change status to 'done' or use 'A' key)\n\
+                             • Adjust inbox size: `folio config set max_items N`\n\
+                             • Change overflow strategy: `folio config set archive_on_overflow [todo|any]`",
                             config.max_items
                         );
                         self.show_cap_warning = true;
-                        false
+                        None
                     }
                 }
             }
@@ -675,7 +679,7 @@ impl App {
                 self.state.inbox_items.push(new_item);
                 let _ = self.save_data().await;
                 self.show_status_message("Item added".to_string());
-                true
+                Some(item_id)
             }
         }
     }
