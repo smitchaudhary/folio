@@ -804,10 +804,10 @@ impl App {
                         self.handle_key_event(key_event).await;
                     }
                     AppEvent::Tick => {
-                        if let Some((_, time)) = self.status_message {
-                            if time.elapsed() > Duration::from_secs(2) {
-                                self.status_message = None;
-                            }
+                        if let Some((_, time)) = self.status_message
+                            && time.elapsed() > Duration::from_secs(2)
+                        {
+                            self.status_message = None;
                         }
                     }
                 }

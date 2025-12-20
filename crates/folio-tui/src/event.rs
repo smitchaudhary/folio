@@ -24,10 +24,10 @@ impl EventHandler {
             async move {
                 let mut reader = EventStream::new();
                 while let Some(event) = reader.next().await {
-                    if let Ok(Event::Key(key_event)) = event {
-                        if tx.send(AppEvent::Key(key_event)).is_err() {
-                            break;
-                        }
+                    if let Ok(Event::Key(key_event)) = event
+                        && tx.send(AppEvent::Key(key_event)).is_err()
+                    {
+                        break;
                     }
                 }
             }

@@ -257,10 +257,10 @@ impl ItemForm {
             }
 
             crossterm::event::KeyCode::Char(c) => {
-                if let Some(field) = self.fields.get_mut(&self.focused_field) {
-                    if let FieldType::Text = field.field_type {
-                        field.value.push(c);
-                    }
+                if let Some(field) = self.fields.get_mut(&self.focused_field)
+                    && let FieldType::Text = field.field_type
+                {
+                    field.value.push(c);
                 }
             }
             crossterm::event::KeyCode::Backspace => {
