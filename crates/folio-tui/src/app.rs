@@ -417,6 +417,32 @@ impl App {
         }
     }
 
+    fn handle_mouse_event(&mut self, mouse_event: crossterm::event::MouseEvent) {
+        use crossterm::event::MouseEventKind;
+
+        if !self.add_form.is_visible
+            && !self.edit_form.is_visible
+            && !self.filter_input_mode
+            && !self.show_delete_confirmation
+            && !self.show_done_confirmation
+            && !self.show_cap_warning
+            && !self.show_config_dialog
+            && !self.show_help
+        {
+            match mouse_event.kind {
+                MouseEventKind::ScrollUp => {
+                    self.state.previous_item();
+                    self.table_state.select(self.state.selected_table_row());
+                }
+                MouseEventKind::ScrollDown => {
+                    self.state.next_item();
+                    self.table_state.select(self.state.selected_table_row());
+                }
+                _ => {}
+            }
+        }
+    }
+
     fn copy_selected_link_to_clipboard(&mut self) {
         if let Some(item) = self.state.selected_item() {
             if let Some(link_to_use) = Self::normalized_link(&item.link) {
@@ -802,6 +828,9 @@ impl App {
                 match event {
                     AppEvent::Key(key_event) => {
                         self.handle_key_event(key_event).await;
+                    }
+                    AppEvent::Mouse(mouse_event) => {
+                        self.handle_mouse_event(mouse_event);
                     }
                     AppEvent::Tick => {
                         if let Some((_, time)) = self.status_message
