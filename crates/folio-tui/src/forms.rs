@@ -391,7 +391,7 @@ impl ItemForm {
 
                             let focused_style = Style::default().fg(Color::Black).bg(Color::Cyan);
                             let cursor_style =
-                                Style::default().fg(Color::Cyan).bg(Color::Black).bold();
+                                Style::default().fg(Color::Cyan).bg(Color::White).bold();
 
                             let spans = vec![
                                 Span::styled(before_cursor, focused_style),
