@@ -9,6 +9,7 @@ use std::collections::HashMap;
 pub struct FormField {
     pub label: String,
     pub value: String,
+    pub cursor_position: usize,
     pub is_focused: bool,
     pub field_type: FieldType,
 }
@@ -43,6 +44,7 @@ impl ItemForm {
             FormField {
                 label: "Name".to_string(),
                 value: String::new(),
+                cursor_position: 0,
                 is_focused: form_type == FormType::Add,
                 field_type: FieldType::Text,
             },
@@ -53,6 +55,7 @@ impl ItemForm {
             FormField {
                 label: "Type".to_string(),
                 value: "blog_post".to_string(),
+                cursor_position: 0,
                 is_focused: false,
                 field_type: FieldType::Dropdown {
                     options: vec![
@@ -74,6 +77,7 @@ impl ItemForm {
             FormField {
                 label: "Author".to_string(),
                 value: String::new(),
+                cursor_position: 0,
                 is_focused: false,
                 field_type: FieldType::Text,
             },
@@ -84,6 +88,7 @@ impl ItemForm {
             FormField {
                 label: "Link".to_string(),
                 value: String::new(),
+                cursor_position: 0,
                 is_focused: false,
                 field_type: FieldType::Text,
             },
@@ -94,6 +99,7 @@ impl ItemForm {
             FormField {
                 label: "Note".to_string(),
                 value: String::new(),
+                cursor_position: 0,
                 is_focused: false,
                 field_type: FieldType::Text,
             },
@@ -110,6 +116,7 @@ impl ItemForm {
     pub fn populate_fields(&mut self, item: &folio_core::Item) {
         if let Some(name_field) = self.fields.get_mut("name") {
             name_field.value = item.name.clone();
+            name_field.cursor_position = name_field.value.len();
         }
 
         if let Some(type_field) = self.fields.get_mut("type") {
@@ -123,14 +130,17 @@ impl ItemForm {
 
         if let Some(author_field) = self.fields.get_mut("author") {
             author_field.value = item.author.clone();
+            author_field.cursor_position = author_field.value.len();
         }
 
         if let Some(link_field) = self.fields.get_mut("link") {
             link_field.value = item.link.clone();
+            link_field.cursor_position = link_field.value.len();
         }
 
         if let Some(note_field) = self.fields.get_mut("note") {
             note_field.value = item.note.clone();
+            note_field.cursor_position = note_field.value.len();
         }
     }
 
@@ -146,8 +156,10 @@ impl ItemForm {
                                 "Type" => "blog_post".to_string(),
                                 _ => String::new(),
                             };
+                            field.cursor_position = 0;
                         } else {
                             field.value = String::new();
+                            field.cursor_position = 0;
                         }
                         field.is_focused = false;
                     }
@@ -226,32 +238,50 @@ impl ItemForm {
                 self.focus_prev();
             }
             crossterm::event::KeyCode::Right => {
-                if let Some(field) = self.fields.get(&self.focused_field) {
-                    if let FieldType::Dropdown { .. } = field.field_type {
-                        if let Some(field) = self.fields.get_mut(&self.focused_field) {
-                            if let FieldType::Dropdown { options, selected } = &mut field.field_type
-                            {
-                                *selected = (*selected + 1) % options.len();
-                                field.value = options[*selected].clone();
+                if let Some(field) = self.fields.get_mut(&self.focused_field) {
+                    match &mut field.field_type {
+                        FieldType::Dropdown { options, selected } => {
+                            *selected = (*selected + 1) % options.len();
+                            field.value = options[*selected].clone();
+                        }
+                        FieldType::Text => {
+                            if field.cursor_position < field.value.len() {
+                                field.cursor_position += 1;
                             }
                         }
                     }
                 }
             }
             crossterm::event::KeyCode::Left => {
-                if let Some(field) = self.fields.get(&self.focused_field) {
-                    if let FieldType::Dropdown { .. } = field.field_type {
-                        if let Some(field) = self.fields.get_mut(&self.focused_field) {
-                            if let FieldType::Dropdown { options, selected } = &mut field.field_type
-                            {
-                                if *selected == 0 {
-                                    *selected = options.len() - 1;
-                                } else {
-                                    *selected -= 1;
-                                }
-                                field.value = options[*selected].clone();
+                if let Some(field) = self.fields.get_mut(&self.focused_field) {
+                    match &mut field.field_type {
+                        FieldType::Dropdown { options, selected } => {
+                            if *selected == 0 {
+                                *selected = options.len() - 1;
+                            } else {
+                                *selected -= 1;
+                            }
+                            field.value = options[*selected].clone();
+                        }
+                        FieldType::Text => {
+                            if field.cursor_position > 0 {
+                                field.cursor_position -= 1;
                             }
                         }
+                    }
+                }
+            }
+            crossterm::event::KeyCode::Home => {
+                if let Some(field) = self.fields.get_mut(&self.focused_field) {
+                    if let FieldType::Text = field.field_type {
+                        field.cursor_position = 0;
+                    }
+                }
+            }
+            crossterm::event::KeyCode::End => {
+                if let Some(field) = self.fields.get_mut(&self.focused_field) {
+                    if let FieldType::Text = field.field_type {
+                        field.cursor_position = field.value.len();
                     }
                 }
             }
@@ -260,13 +290,26 @@ impl ItemForm {
                 if let Some(field) = self.fields.get_mut(&self.focused_field)
                     && let FieldType::Text = field.field_type
                 {
-                    field.value.push(c);
+                    field.value.insert(field.cursor_position, c);
+                    field.cursor_position += 1;
                 }
             }
             crossterm::event::KeyCode::Backspace => {
                 if let Some(field) = self.fields.get_mut(&self.focused_field) {
                     if let FieldType::Text = field.field_type {
-                        field.value.pop();
+                        if field.cursor_position > 0 {
+                            field.cursor_position -= 1;
+                            field.value.remove(field.cursor_position);
+                        }
+                    }
+                }
+            }
+            crossterm::event::KeyCode::Delete => {
+                if let Some(field) = self.fields.get_mut(&self.focused_field) {
+                    if let FieldType::Text = field.field_type {
+                        if field.cursor_position < field.value.len() {
+                            field.value.remove(field.cursor_position);
+                        }
                     }
                 }
             }
@@ -330,20 +373,46 @@ impl ItemForm {
                     Style::default().fg(Color::White)
                 };
 
-                let value_text = match &field.field_type {
-                    FieldType::Text => field.value.clone(),
+                let value_widget: Paragraph = match &field.field_type {
+                    FieldType::Text => {
+                        if field.is_focused {
+                            use ratatui::text::{Line, Span};
+                            let before_cursor = &field.value[..field.cursor_position];
+                            let cursor_char = field
+                                .value
+                                .chars()
+                                .nth(field.cursor_position)
+                                .unwrap_or(' ');
+                            let after_cursor = if field.cursor_position < field.value.len() {
+                                &field.value[field.cursor_position + 1..]
+                            } else {
+                                ""
+                            };
+
+                            let focused_style = Style::default().fg(Color::Black).bg(Color::Cyan);
+                            let cursor_style =
+                                Style::default().fg(Color::Cyan).bg(Color::Black).bold();
+
+                            let spans = vec![
+                                Span::styled(before_cursor, focused_style),
+                                Span::styled(cursor_char.to_string(), cursor_style),
+                                Span::styled(after_cursor, focused_style),
+                            ];
+                            Paragraph::new(Line::from(spans))
+                                .block(Block::default().style(Style::default().bg(Color::Cyan)))
+                        } else {
+                            Paragraph::new(field.value.clone()).style(value_style)
+                        }
+                    }
                     FieldType::Dropdown { .. } => {
-                        format!(
+                        let text = format!(
                             "{} {}",
                             field.value,
                             if field.is_focused { "▼" } else { "" }
-                        )
+                        );
+                        Paragraph::new(text).style(value_style)
                     }
                 };
-
-                let value = Paragraph::new(value_text)
-                    .style(value_style)
-                    .wrap(ratatui::widgets::Wrap { trim: true });
 
                 let field_layout = Layout::default()
                     .direction(Direction::Horizontal)
@@ -351,7 +420,7 @@ impl ItemForm {
                     .split(field_area);
 
                 frame.render_widget(label, field_layout[0]);
-                frame.render_widget(value, field_layout[1]);
+                frame.render_widget(value_widget, field_layout[1]);
             }
         }
 
