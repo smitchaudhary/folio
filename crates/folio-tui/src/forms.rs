@@ -245,7 +245,8 @@ impl ItemForm {
                             field.value = options[*selected].clone();
                         }
                         FieldType::Text => {
-                            if field.cursor_position < field.value.len() {
+                            let char_count = field.value.chars().count();
+                            if field.cursor_position < char_count {
                                 field.cursor_position += 1;
                             }
                         }
@@ -281,7 +282,7 @@ impl ItemForm {
             crossterm::event::KeyCode::End => {
                 if let Some(field) = self.fields.get_mut(&self.focused_field) {
                     if let FieldType::Text = field.field_type {
-                        field.cursor_position = field.value.len();
+                        field.cursor_position = field.value.chars().count();
                     }
                 }
             }
@@ -290,7 +291,14 @@ impl ItemForm {
                 if let Some(field) = self.fields.get_mut(&self.focused_field)
                     && let FieldType::Text = field.field_type
                 {
-                    field.value.insert(field.cursor_position, c);
+                    // Convert char index to byte index for insertion
+                    let byte_pos = field
+                        .value
+                        .char_indices()
+                        .nth(field.cursor_position)
+                        .map(|(i, _)| i)
+                        .unwrap_or(field.value.len());
+                    field.value.insert(byte_pos, c);
                     field.cursor_position += 1;
                 }
             }
@@ -299,7 +307,14 @@ impl ItemForm {
                     if let FieldType::Text = field.field_type {
                         if field.cursor_position > 0 {
                             field.cursor_position -= 1;
-                            field.value.remove(field.cursor_position);
+                            // Convert char index to byte index for removal
+                            let byte_pos = field
+                                .value
+                                .char_indices()
+                                .nth(field.cursor_position)
+                                .map(|(i, _)| i)
+                                .unwrap_or(0);
+                            field.value.remove(byte_pos);
                         }
                     }
                 }
@@ -307,8 +322,16 @@ impl ItemForm {
             crossterm::event::KeyCode::Delete => {
                 if let Some(field) = self.fields.get_mut(&self.focused_field) {
                     if let FieldType::Text = field.field_type {
-                        if field.cursor_position < field.value.len() {
-                            field.value.remove(field.cursor_position);
+                        let char_count = field.value.chars().count();
+                        if field.cursor_position < char_count {
+                            // Convert char index to byte index for removal
+                            let byte_pos = field
+                                .value
+                                .char_indices()
+                                .nth(field.cursor_position)
+                                .map(|(i, _)| i)
+                                .unwrap_or(0);
+                            field.value.remove(byte_pos);
                         }
                     }
                 }
@@ -377,16 +400,23 @@ impl ItemForm {
                     FieldType::Text => {
                         if field.is_focused {
                             use ratatui::text::{Line, Span};
-                            let before_cursor = &field.value[..field.cursor_position];
-                            let cursor_char = field
-                                .value
-                                .chars()
+
+                            let char_indices = field.value.char_indices();
+                            let cursor_byte_start = char_indices
+                                .clone()
                                 .nth(field.cursor_position)
-                                .unwrap_or(' ');
-                            let after_cursor = if field.cursor_position < field.value.len() {
-                                &field.value[field.cursor_position + 1..]
-                            } else {
-                                ""
+                                .map(|(i, _)| i);
+
+                            let (before_cursor, cursor_char, after_cursor) = match cursor_byte_start
+                            {
+                                Some(byte_pos) => {
+                                    let before = &field.value[..byte_pos];
+                                    let c = field.value[byte_pos..].chars().next().unwrap();
+                                    let after_byte_start = byte_pos + c.len_utf8();
+                                    let after = &field.value[after_byte_start..];
+                                    (before, c, after)
+                                }
+                                None => (field.value.as_str(), ' ', ""),
                             };
 
                             let focused_style = Style::default().fg(Color::Black).bg(Color::Cyan);
