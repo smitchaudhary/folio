@@ -396,19 +396,19 @@ impl App {
                 self.copy_selected_link_to_clipboard();
             }
             KeyCode::Enter => {
-                if let Some(item) = self.state.selected_item() {
-                    if let Some(link_to_use) = Self::normalized_link(&item.link) {
-                        match opener::open(&link_to_use) {
-                            Ok(_) => {
-                                self.show_status_message("Opening link...".to_string());
+                if let Some(item) = self.state.selected_item()
+                    && let Some(link_to_use) = Self::normalized_link(&item.link)
+                {
+                    match opener::open(&link_to_use) {
+                        Ok(_) => {
+                            self.show_status_message("Opening link...".to_string());
+                        }
+                        Err(_) => {
+                            // Try without https:// prefix if we added it
+                            if link_to_use != item.link {
+                                let _ = opener::open(&item.link);
                             }
-                            Err(_) => {
-                                // Try without https:// prefix if we added it
-                                if link_to_use != item.link {
-                                    let _ = opener::open(&item.link);
-                                }
-                                self.show_status_message("Opening link...".to_string());
-                            }
+                            self.show_status_message("Opening link...".to_string());
                         }
                     }
                 }
@@ -444,20 +444,20 @@ impl App {
     }
 
     fn copy_selected_link_to_clipboard(&mut self) {
-        if let Some(item) = self.state.selected_item() {
-            if let Some(link_to_use) = Self::normalized_link(&item.link) {
-                match arboard::Clipboard::new() {
-                    Ok(mut clipboard) => match clipboard.set_text(&link_to_use) {
-                        Ok(_) => {
-                            self.show_status_message("Link copied to clipboard".to_string());
-                        }
-                        Err(_) => {
-                            self.show_status_message("Failed to copy link".to_string());
-                        }
-                    },
-                    Err(_) => {
-                        self.show_status_message("Clipboard not available".to_string());
+        if let Some(item) = self.state.selected_item()
+            && let Some(link_to_use) = Self::normalized_link(&item.link)
+        {
+            match arboard::Clipboard::new() {
+                Ok(mut clipboard) => match clipboard.set_text(&link_to_use) {
+                    Ok(_) => {
+                        self.show_status_message("Link copied to clipboard".to_string());
                     }
+                    Err(_) => {
+                        self.show_status_message("Failed to copy link".to_string());
+                    }
+                },
+                Err(_) => {
+                    self.show_status_message("Clipboard not available".to_string());
                 }
             }
         }

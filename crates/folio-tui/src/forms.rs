@@ -273,17 +273,17 @@ impl ItemForm {
                 }
             }
             crossterm::event::KeyCode::Home => {
-                if let Some(field) = self.fields.get_mut(&self.focused_field) {
-                    if let FieldType::Text = field.field_type {
-                        field.cursor_position = 0;
-                    }
+                if let Some(field) = self.fields.get_mut(&self.focused_field)
+                    && let FieldType::Text = field.field_type
+                {
+                    field.cursor_position = 0;
                 }
             }
             crossterm::event::KeyCode::End => {
-                if let Some(field) = self.fields.get_mut(&self.focused_field) {
-                    if let FieldType::Text = field.field_type {
-                        field.cursor_position = field.value.chars().count();
-                    }
+                if let Some(field) = self.fields.get_mut(&self.focused_field)
+                    && let FieldType::Text = field.field_type
+                {
+                    field.cursor_position = field.value.chars().count();
                 }
             }
 
@@ -303,36 +303,35 @@ impl ItemForm {
                 }
             }
             crossterm::event::KeyCode::Backspace => {
-                if let Some(field) = self.fields.get_mut(&self.focused_field) {
-                    if let FieldType::Text = field.field_type {
-                        if field.cursor_position > 0 {
-                            field.cursor_position -= 1;
-                            // Convert char index to byte index for removal
-                            let byte_pos = field
-                                .value
-                                .char_indices()
-                                .nth(field.cursor_position)
-                                .map(|(i, _)| i)
-                                .unwrap_or(0);
-                            field.value.remove(byte_pos);
-                        }
-                    }
+                if let Some(field) = self.fields.get_mut(&self.focused_field)
+                    && let FieldType::Text = field.field_type
+                    && field.cursor_position > 0
+                {
+                    field.cursor_position -= 1;
+                    // Convert char index to byte index for removal
+                    let byte_pos = field
+                        .value
+                        .char_indices()
+                        .nth(field.cursor_position)
+                        .map(|(i, _)| i)
+                        .unwrap_or(0);
+                    field.value.remove(byte_pos);
                 }
             }
             crossterm::event::KeyCode::Delete => {
-                if let Some(field) = self.fields.get_mut(&self.focused_field) {
-                    if let FieldType::Text = field.field_type {
-                        let char_count = field.value.chars().count();
-                        if field.cursor_position < char_count {
-                            // Convert char index to byte index for removal
-                            let byte_pos = field
-                                .value
-                                .char_indices()
-                                .nth(field.cursor_position)
-                                .map(|(i, _)| i)
-                                .unwrap_or(0);
-                            field.value.remove(byte_pos);
-                        }
+                if let Some(field) = self.fields.get_mut(&self.focused_field)
+                    && let FieldType::Text = field.field_type
+                {
+                    let char_count = field.value.chars().count();
+                    if field.cursor_position < char_count {
+                        // Convert char index to byte index for removal
+                        let byte_pos = field
+                            .value
+                            .char_indices()
+                            .nth(field.cursor_position)
+                            .map(|(i, _)| i)
+                            .unwrap_or(0);
+                        field.value.remove(byte_pos);
                     }
                 }
             }
