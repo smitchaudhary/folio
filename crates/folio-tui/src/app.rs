@@ -34,6 +34,12 @@ pub struct App {
     pub config_overflow_strategy: usize,
 }
 
+impl Default for App {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl App {
     pub fn new() -> Self {
         Self {
