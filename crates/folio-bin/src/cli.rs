@@ -37,44 +37,50 @@ pub enum Commands {
         #[arg(long, value_delimiter = ',')]
         r#type: Option<Vec<String>>,
 
-        #[arg(long, conflicts_with = "all")]
+        #[arg(long, conflicts_with = "all", help = "Show archived items")]
         archive: bool,
 
-        #[arg(long, conflicts_with = "archive")]
+        #[arg(long, conflicts_with = "archive", help = "Show inbox and archive combined")]
         all: bool,
     },
 
     SetStatus {
+        #[arg(help = "Item ID (position in the current view)")]
         id: usize,
 
+        #[arg(help = "New status: todo, doing, done")]
         status: String,
 
-        #[arg(long)]
+        #[arg(long, help = "Target archived items — IDs are positions within the archive")]
         archive: bool,
     },
 
     Edit {
+        #[arg(help = "Item ID (position in the current view)")]
         id: usize,
 
-        #[arg(long)]
+        #[arg(long, help = "Target archived items — IDs are positions within the archive")]
         archive: bool,
     },
 
     Archive {
+        #[arg(help = "Item ID (position in the current view)")]
         id: usize,
     },
 
     Delete {
+        #[arg(help = "Item ID (position in the current view)")]
         id: usize,
 
-        #[arg(long)]
+        #[arg(long, help = "Target archived items — IDs are positions within the archive")]
         archive: bool,
     },
 
     MarkRef {
+        #[arg(help = "Item ID (position in the current view)")]
         id: usize,
 
-        #[arg(long)]
+        #[arg(long, help = "Target archived items — IDs are positions within the archive")]
         archive: bool,
     },
 

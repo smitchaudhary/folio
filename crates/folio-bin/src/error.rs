@@ -3,7 +3,7 @@ use thiserror::Error;
 
 #[derive(Error, Debug)]
 pub enum CliError {
-    #[error("Item with ID {id} not found. Use 'folio list' to see available items.")]
+    #[error("Item with ID {id} not found. Use 'folio list' (inbox) or 'folio list --archive' (archived) to see available items.")]
     ItemNotFound { id: usize },
 
     #[error("Invalid status '{status}'. Valid options are: todo, doing, done")]
