@@ -1,5 +1,5 @@
 use clap::Parser;
-use folio_bin::cli::{Cli, Commands, ConfigSubcommands};
+use folio_bin::cli::{Cli, Commands, ConfigSubcommands, ListView};
 use folio_bin::error::{CliError, print_error};
 use folio_core::{ItemType, Kind, OverflowStrategy, Status};
 use folio_storage::{
@@ -41,8 +41,20 @@ async fn run() -> Result<(), CliError> {
             } => {
                 handle_add_command(&config_manager, name, r#type, author, link, note, kind).await?;
             }
-            Commands::List { status, r#type } => {
-                handle_list_command(status.as_deref(), r#type.as_deref()).await?;
+            Commands::List {
+                status,
+                r#type,
+                archive,
+                all,
+            } => {
+                let view = if *archive {
+                    ListView::Archive
+                } else if *all {
+                    ListView::All
+                } else {
+                    ListView::Inbox
+                };
+                handle_list_command(view, status.as_deref(), r#type.as_deref()).await?;
             }
             Commands::SetStatus { id, status } => {
                 handle_set_status_command(&config_manager, *id, status).await?;
@@ -72,20 +84,21 @@ async fn run() -> Result<(), CliError> {
 }
 
 async fn handle_list_command(
+    view: ListView,
     status_filters: Option<&[String]>,
     type_filters: Option<&[String]>,
 ) -> Result<(), CliError> {
-    let inbox_path = get_inbox_path()?;
-    let archive_path = get_archive_path()?;
+    let items: Vec<folio_core::Item> = match view {
+        ListView::Inbox => load_items_from_file(get_inbox_path()?)?,
+        ListView::Archive => load_items_from_file(get_archive_path()?)?,
+        ListView::All => {
+            let mut items = load_items_from_file(get_inbox_path()?)?;
+            items.extend(load_items_from_file(get_archive_path()?)?);
+            items
+        }
+    };
 
-    let inbox_items = load_items_from_file(&inbox_path)?;
-    let archive_items = load_items_from_file(&archive_path)?;
-
-    let mut all_items = Vec::new();
-    all_items.extend(inbox_items);
-    all_items.extend(archive_items);
-
-    let filtered_items: Vec<_> = all_items
+    let filtered_items: Vec<_> = items
         .into_iter()
         .filter(|item| {
             if let Some(status_filters) = status_filters

@@ -36,6 +36,12 @@ pub enum Commands {
 
         #[arg(long, value_delimiter = ',')]
         r#type: Option<Vec<String>>,
+
+        #[arg(long, conflicts_with = "all")]
+        archive: bool,
+
+        #[arg(long, conflicts_with = "archive")]
+        all: bool,
     },
 
     SetStatus {
@@ -64,6 +70,13 @@ pub enum Commands {
         #[command(subcommand)]
         subcommand: ConfigSubcommands,
     },
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ListView {
+    Inbox,
+    Archive,
+    All,
 }
 
 #[derive(Subcommand, Debug)]
