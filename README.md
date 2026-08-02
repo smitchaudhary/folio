@@ -42,9 +42,11 @@ folio add --name "My fav video" --type video --author "Some dude"
 
 ### View Your Items
 ```bash
-folio list
+folio list                    # Inbox items (default)
+folio list --archive          # Archived items
+folio list --all              # All items (inbox + archive)
 
-# List only videos
+# List only videos in the current view
 folio list --type video
 
 folio list | grep -i rust
@@ -81,8 +83,10 @@ The items can be of one of these 7 types (including others for a catch-all)
 ```bash
 folio add --name "Title" --type video --link "https://..." --author "Creator"
 
-folio list                    # All items
-folio list --type video       # Filter by type
+folio list                    # Inbox items (default)
+folio list --archive          # Archived items
+folio list --all              # All items (inbox + archive)
+folio list --type video       # Filter by type (within the chosen view)
 folio list --status todo      # Filter by status
 
 # Update status
@@ -151,6 +155,7 @@ The version thing is in case I want to later change something and then migrate s
 
 - **`abort`**: Prevent adding new items (safest)
 - **`todo`**: Auto-archive oldest todo items (the lose it of the "read it or lose it thing")
+- **`any`**: Auto-archive the oldest item, regardless of status
 
 ## Data Storage
 
@@ -185,4 +190,4 @@ Folio enforces the "read it or lose it" philosophy by:
 
 ## License
 
-No license. It is just some basic code. Do what you want with it.
+Released into the public domain under [The Unlicense](LICENSE). Do what you want with it.
