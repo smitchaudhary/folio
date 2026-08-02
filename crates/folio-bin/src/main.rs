@@ -98,6 +98,8 @@ async fn handle_list_command(
         }
     };
 
+    let view_is_empty = items.is_empty();
+
     let filtered_items: Vec<_> = items
         .into_iter()
         .filter(|item| {
@@ -129,7 +131,15 @@ async fn handle_list_command(
         .collect();
 
     if filtered_items.is_empty() {
-        println!("No items found.");
+        if view_is_empty {
+            match view {
+                ListView::Inbox => println!("No items in inbox."),
+                ListView::Archive => println!("No archived items."),
+                ListView::All => println!("No items found."),
+            }
+        } else {
+            println!("No items match the filter.");
+        }
         return Ok(());
     }
 
