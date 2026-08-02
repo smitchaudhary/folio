@@ -32,8 +32,10 @@ impl ItemsTable {
                     " Archive ".to_string()
                 };
                 (
-                    Row::new(vec!["ID", "R", "Name", "Author", "Done On", "Type", "Note", "Link"])
-                        .style(Style::default().fg(Color::White).bold()),
+                    Row::new(vec![
+                        "ID", "R", "Name", "Author", "Done On", "Type", "Note", "Link",
+                    ])
+                    .style(Style::default().fg(Color::White).bold()),
                     title,
                     Style::default().fg(Color::Blue).bold(),
                 )

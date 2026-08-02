@@ -150,9 +150,9 @@ fn matches_filters(
     if let Some(status_filters) = status_filters
         && !status_filters.is_empty()
     {
-        let matches = status_filters.iter().any(|s| {
-            Status::from_str(&s.to_lowercase()).is_ok_and(|status| status == item.status)
-        });
+        let matches = status_filters
+            .iter()
+            .any(|s| Status::from_str(&s.to_lowercase()).is_ok_and(|status| status == item.status));
         if !matches {
             return false;
         }
@@ -162,8 +162,7 @@ fn matches_filters(
         && !type_filters.is_empty()
     {
         let matches = type_filters.iter().any(|t| {
-            ItemType::from_str(&t.to_lowercase())
-                .is_ok_and(|item_type| item_type == item.item_type)
+            ItemType::from_str(&t.to_lowercase()).is_ok_and(|item_type| item_type == item.item_type)
         });
         if !matches {
             return false;
@@ -189,12 +188,17 @@ async fn handle_set_status_command(
         status: status_str.to_string(),
     })?;
 
-    let view_items = if archive { &archive_items } else { &inbox_items };
+    let view_items = if archive {
+        &archive_items
+    } else {
+        &inbox_items
+    };
     let index = resolve_item_index(id, view_items.len())?;
     let stable_id = view_items[index].id();
 
     let config = config_manager.get();
-    let result = folio_core::update_item_status(stable_id, new_status, inbox_items, archive_items, config)?;
+    let result =
+        folio_core::update_item_status(stable_id, new_status, inbox_items, archive_items, config)?;
 
     if !result.item_found {
         return Err(CliError::ItemNotFound { id });

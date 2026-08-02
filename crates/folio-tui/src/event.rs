@@ -31,11 +31,12 @@ impl EventHandler {
                                 break;
                             }
                         }
-                        Ok(Event::Mouse(mouse_event)) => {
-                            if tx.send(AppEvent::Mouse(mouse_event)).is_err() {
-                                break;
-                            }
+                        Ok(Event::Mouse(mouse_event))
+                            if tx.send(AppEvent::Mouse(mouse_event)).is_err() =>
+                        {
+                            break;
                         }
+
                         _ => {}
                     }
                 }
