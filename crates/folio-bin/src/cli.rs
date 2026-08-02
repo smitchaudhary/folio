@@ -48,10 +48,16 @@ pub enum Commands {
         id: usize,
 
         status: String,
+
+        #[arg(long)]
+        archive: bool,
     },
 
     Edit {
         id: usize,
+
+        #[arg(long)]
+        archive: bool,
     },
 
     Archive {
@@ -60,10 +66,16 @@ pub enum Commands {
 
     Delete {
         id: usize,
+
+        #[arg(long)]
+        archive: bool,
     },
 
     MarkRef {
         id: usize,
+
+        #[arg(long)]
+        archive: bool,
     },
 
     Config {

@@ -56,20 +56,24 @@ async fn run() -> Result<(), CliError> {
                 };
                 handle_list_command(view, status.as_deref(), r#type.as_deref()).await?;
             }
-            Commands::SetStatus { id, status } => {
-                handle_set_status_command(&config_manager, *id, status).await?;
+            Commands::SetStatus {
+                id,
+                status,
+                archive,
+            } => {
+                handle_set_status_command(&config_manager, *id, status, *archive).await?;
             }
-            Commands::Edit { id } => {
-                handle_edit_command(*id).await?;
+            Commands::Edit { id, archive } => {
+                handle_edit_command(*id, *archive).await?;
             }
             Commands::Archive { id } => {
                 handle_archive_command(*id).await?;
             }
-            Commands::Delete { id } => {
-                handle_delete_command(*id).await?;
+            Commands::Delete { id, archive } => {
+                handle_delete_command(*id, *archive).await?;
             }
-            Commands::MarkRef { id } => {
-                handle_mark_ref_command(*id).await?;
+            Commands::MarkRef { id, archive } => {
+                handle_mark_ref_command(*id, *archive).await?;
             }
             Commands::Config { subcommand } => {
                 handle_config_command(subcommand).await?;
@@ -81,6 +85,15 @@ async fn run() -> Result<(), CliError> {
     }
 
     Ok(())
+}
+
+fn resolve_item_index(id: usize, len: usize) -> Result<usize, CliError> {
+    let index = id.checked_sub(1).ok_or(CliError::ItemNotFound { id })?;
+    if index < len {
+        Ok(index)
+    } else {
+        Err(CliError::ItemNotFound { id })
+    }
 }
 
 async fn handle_list_command(
@@ -156,6 +169,7 @@ async fn handle_set_status_command(
     config_manager: &ConfigManager,
     id: usize,
     status_str: &str,
+    archive: bool,
 ) -> Result<(), CliError> {
     let inbox_path = get_inbox_path()?;
     let archive_path = get_archive_path()?;
@@ -167,13 +181,9 @@ async fn handle_set_status_command(
         status: status_str.to_string(),
     })?;
 
-    let stable_id = if id > 0 && id <= inbox_items.len() {
-        inbox_items[id - 1].id()
-    } else if id > inbox_items.len() && id <= inbox_items.len() + archive_items.len() {
-        archive_items[id - inbox_items.len() - 1].id()
-    } else {
-        return Err(CliError::ItemNotFound { id });
-    };
+    let view_items = if archive { &archive_items } else { &inbox_items };
+    let index = resolve_item_index(id, view_items.len())?;
+    let stable_id = view_items[index].id();
 
     let config = config_manager.get();
     let result = folio_core::update_item_status(stable_id, new_status, inbox_items, archive_items, config)?;
@@ -214,28 +224,20 @@ async fn handle_set_status_command(
     Ok(())
 }
 
-async fn handle_edit_command(id: usize) -> Result<(), CliError> {
+async fn handle_edit_command(id: usize, archive: bool) -> Result<(), CliError> {
     let inbox_path = get_inbox_path()?;
     let archive_path = get_archive_path()?;
 
     let mut inbox_items = load_items_from_file(&inbox_path)?;
     let mut archive_items = load_items_from_file(&archive_path)?;
 
-    let (is_in_inbox, item_index) = if id > 0 && id <= inbox_items.len() {
-        let item_index = id - 1;
-        (true, item_index)
-    } else if id > inbox_items.len() && id <= inbox_items.len() + archive_items.len() {
-        let item_index = id - inbox_items.len() - 1;
-        (false, item_index)
+    let view_items: &mut Vec<folio_core::Item> = if archive {
+        &mut archive_items
     } else {
-        return Err(CliError::ItemNotFound { id });
+        &mut inbox_items
     };
-
-    let item = if is_in_inbox {
-        &mut inbox_items[item_index]
-    } else {
-        &mut archive_items[item_index]
-    };
+    let index = resolve_item_index(id, view_items.len())?;
+    let item = &mut view_items[index];
 
     let original_name = item.name.clone();
     let original_type = format!("{:?}", item.item_type);
@@ -279,10 +281,10 @@ async fn handle_edit_command(id: usize) -> Result<(), CliError> {
 
     item.validate()?;
 
-    if is_in_inbox {
-        save_inbox(&inbox_items)?;
-    } else {
+    if archive {
         folio_storage::save_archive(&archive_items)?;
+    } else {
+        save_inbox(&inbox_items)?;
     }
 
     println!("Item #{} updated successfully", id);
@@ -295,44 +297,43 @@ async fn handle_archive_command(id: usize) -> Result<(), CliError> {
     let mut inbox_items = load_items_from_file(&inbox_path)?;
     let archive_items = load_items_from_file(&archive_path)?;
 
-    if id > 0 && id <= inbox_items.len() {
-        let item_index = id - 1;
-        let mut item = inbox_items.remove(item_index);
+    let index = match resolve_item_index(id, inbox_items.len()) {
+        Ok(index) => index,
+        Err(_) => {
+            if resolve_item_index(id, archive_items.len()).is_ok() {
+                println!("Item #{} is already in archive", id);
+                return Ok(());
+            }
+            return Err(CliError::ItemNotFound { id });
+        }
+    };
 
-        item.status = Status::Done;
-        folio_core::update_timestamps(&mut item);
+    let mut item = inbox_items.remove(index);
 
-        append_to_archive(&item)?;
+    item.status = Status::Done;
+    folio_core::update_timestamps(&mut item);
 
-        save_inbox(&inbox_items)?;
+    append_to_archive(&item)?;
 
-        println!("Item #{} marked as done and archived successfully", id);
-        Ok(())
-    } else if id > inbox_items.len() && id <= inbox_items.len() + archive_items.len() {
-        println!("Item #{} is already in archive", id);
-        Ok(())
-    } else {
-        Err(CliError::ItemNotFound { id })
-    }
+    save_inbox(&inbox_items)?;
+
+    println!("Item #{} marked as done and archived successfully", id);
+    Ok(())
 }
 
-async fn handle_delete_command(id: usize) -> Result<(), CliError> {
+async fn handle_delete_command(id: usize, archive: bool) -> Result<(), CliError> {
     let inbox_path = get_inbox_path()?;
     let archive_path = get_archive_path()?;
     let mut inbox_items = load_items_from_file(&inbox_path)?;
     let mut archive_items = load_items_from_file(&archive_path)?;
 
-    let (is_in_inbox, item_index, item) = if id > 0 && id <= inbox_items.len() {
-        let item_index = id - 1;
-        let item = inbox_items[item_index].clone();
-        (true, item_index, item)
-    } else if id > inbox_items.len() && id <= inbox_items.len() + archive_items.len() {
-        let item_index = id - inbox_items.len() - 1;
-        let item = archive_items[item_index].clone();
-        (false, item_index, item)
+    let view_items: &mut Vec<folio_core::Item> = if archive {
+        &mut archive_items
     } else {
-        return Err(CliError::ItemNotFound { id });
+        &mut inbox_items
     };
+    let index = resolve_item_index(id, view_items.len())?;
+    let item = view_items[index].clone();
 
     println!("Item to delete:");
     println!("  Name: {}", item.name);
@@ -354,52 +355,46 @@ async fn handle_delete_command(id: usize) -> Result<(), CliError> {
         return Ok(());
     }
 
-    if is_in_inbox {
-        inbox_items.remove(item_index);
-        save_inbox(&inbox_items)?;
-    } else {
-        archive_items.remove(item_index);
+    view_items.remove(index);
+
+    if archive {
         folio_storage::save_archive(&archive_items)?;
+    } else {
+        save_inbox(&inbox_items)?;
     }
 
     println!("Item #{} deleted successfully", id);
     Ok(())
 }
 
-async fn handle_mark_ref_command(id: usize) -> Result<(), CliError> {
+async fn handle_mark_ref_command(id: usize, archive: bool) -> Result<(), CliError> {
     let inbox_path = get_inbox_path()?;
     let archive_path = get_archive_path()?;
     let inbox_items = load_items_from_file(&inbox_path)?;
     let mut archive_items = load_items_from_file(&archive_path)?;
 
-    let (is_in_inbox, item_index) = if id > 0 && id <= inbox_items.len() {
-        let item_index = id - 1;
-        (true, item_index)
-    } else if id > inbox_items.len() && id <= inbox_items.len() + archive_items.len() {
-        let item_index = id - inbox_items.len() - 1;
-        (false, item_index)
-    } else {
+    if !archive {
+        if resolve_item_index(id, inbox_items.len()).is_ok() {
+            println!(
+                "Cannot mark reference for items in inbox. Only archived (done) items can be marked as references. Use 'folio mark-ref --archive <id>'."
+            );
+            return Ok(());
+        }
         return Err(CliError::ItemNotFound { id });
-    };
+    }
 
-    if is_in_inbox {
-        println!(
-            "Cannot mark reference for items in inbox. Only archived (done) items can be marked as references."
-        );
-        return Ok(());
-    } else {
-        let item = &mut archive_items[item_index];
-        match item.kind {
-            folio_core::Kind::Normal => {
-                item.kind = folio_core::Kind::Reference;
-                folio_storage::save_archive(&archive_items)?;
-                println!("Item #{} marked as reference", id);
-            }
-            folio_core::Kind::Reference => {
-                item.kind = folio_core::Kind::Normal;
-                folio_storage::save_archive(&archive_items)?;
-                println!("Item #{} unmarked as reference", id);
-            }
+    let index = resolve_item_index(id, archive_items.len())?;
+    let item = &mut archive_items[index];
+    match item.kind {
+        folio_core::Kind::Normal => {
+            item.kind = folio_core::Kind::Reference;
+            folio_storage::save_archive(&archive_items)?;
+            println!("Item #{} marked as reference", id);
+        }
+        folio_core::Kind::Reference => {
+            item.kind = folio_core::Kind::Normal;
+            folio_storage::save_archive(&archive_items)?;
+            println!("Item #{} unmarked as reference", id);
         }
     }
 
