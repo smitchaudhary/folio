@@ -167,9 +167,16 @@ async fn handle_set_status_command(
         status: status_str.to_string(),
     })?;
 
+    let stable_id = if id > 0 && id <= inbox_items.len() {
+        inbox_items[id - 1].id()
+    } else if id > inbox_items.len() && id <= inbox_items.len() + archive_items.len() {
+        archive_items[id - inbox_items.len() - 1].id()
+    } else {
+        return Err(CliError::ItemNotFound { id });
+    };
+
     let config = config_manager.get();
-    let result =
-        folio_core::update_item_status(id, new_status, inbox_items, archive_items, config)?;
+    let result = folio_core::update_item_status(stable_id, new_status, inbox_items, archive_items, config)?;
 
     if !result.item_found {
         return Err(CliError::ItemNotFound { id });

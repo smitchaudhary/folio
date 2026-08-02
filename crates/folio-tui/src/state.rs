@@ -301,28 +301,12 @@ impl AppState {
         let selected_id = self.selected_item_id.ok_or(CoreError::ItemNotFound)?;
         let previous_row = self.selected_table_row();
 
-        let (item_id, found_in_view) = if let Some(pos) = self
-            .inbox_items
-            .iter()
-            .position(|item| item.id() == selected_id)
-        {
-            (pos + 1, View::Inbox)
-        } else if let Some(pos) = self
-            .archive_items
-            .iter()
-            .position(|item| item.id() == selected_id)
-        {
-            (self.inbox_items.len() + pos + 1, View::Archive)
-        } else {
-            return Err(CoreError::ItemNotFound);
-        };
-
         let config_manager = folio_storage::ConfigManager::new()
             .map_err(|_| CoreError::ValidationError("Failed to load config".to_string()))?;
         let config = config_manager.get();
 
         let result = folio_core::update_item_status(
-            item_id,
+            selected_id,
             new_status,
             self.inbox_items.clone(),
             self.archive_items.clone(),
@@ -333,15 +317,12 @@ impl AppState {
             self.inbox_items = result.inbox_items.clone();
             self.archive_items = result.archive_items.clone();
 
-            if found_in_view == View::Archive && result.moved_to_inbox {
-                if self.current_view == View::Archive {
-                    self.reselect_visible_row(previous_row);
-                }
-            } else if self.current_view == View::Inbox
-                && result
-                    .moved_to_archive
-                    .iter()
-                    .any(|item| item.id() == selected_id)
+            if (self.current_view == View::Archive && result.moved_to_inbox)
+                || (self.current_view == View::Inbox
+                    && result
+                        .moved_to_archive
+                        .iter()
+                        .any(|item| item.id() == selected_id))
             {
                 self.reselect_visible_row(previous_row);
             }

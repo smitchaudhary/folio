@@ -264,7 +264,7 @@ pub struct StatusUpdateResult {
 }
 
 pub fn update_item_status(
-    item_id: usize,
+    stable_id: usize,
     new_status: Status,
     mut inbox_items: Vec<Item>,
     mut archive_items: Vec<Item>,
@@ -279,8 +279,7 @@ pub fn update_item_status(
         item_found: false,
     };
 
-    if item_id > 0 && item_id <= inbox_items.len() {
-        let item_index = item_id - 1;
+    if let Some(item_index) = inbox_items.iter().position(|item| item.id() == stable_id) {
         let item = &mut inbox_items[item_index];
 
         let status_result = change_item_status(item, new_status);
@@ -291,14 +290,7 @@ pub fn update_item_status(
             result.moved_to_archive.push(done_item.clone());
             archive_items.push(done_item);
         }
-
-        result.inbox_items = inbox_items;
-        result.archive_items = archive_items;
-        return Ok(result);
-    }
-
-    if item_id > inbox_items.len() && item_id <= inbox_items.len() + archive_items.len() {
-        let item_index = item_id - inbox_items.len() - 1;
+    } else if let Some(item_index) = archive_items.iter().position(|item| item.id() == stable_id) {
         let item = &mut archive_items[item_index];
 
         let status_result = change_item_status(item, new_status);
@@ -326,11 +318,9 @@ pub fn update_item_status(
                 }
             }
         }
-
-        result.inbox_items = inbox_items;
-        result.archive_items = archive_items;
-        return Ok(result);
     }
 
+    result.inbox_items = inbox_items;
+    result.archive_items = archive_items;
     Ok(result)
 }
