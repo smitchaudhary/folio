@@ -61,7 +61,8 @@ impl ItemsTable {
                         let added_date = item.added_at.format("%Y-%m-%d").to_string();
 
                         let link_display = if item.link.len() > 25 {
-                            format!("{}...", &item.link[..22])
+                            let end = item.link.floor_char_boundary(22);
+                            format!("{}...", &item.link[..end])
                         } else {
                             item.link.clone()
                         };
@@ -100,7 +101,8 @@ impl ItemsTable {
                         };
 
                         let link_display = if item.link.len() > 20 {
-                            format!("{}...", &item.link[..17])
+                            let end = item.link.floor_char_boundary(17);
+                            format!("{}...", &item.link[..end])
                         } else {
                             item.link.clone()
                         };

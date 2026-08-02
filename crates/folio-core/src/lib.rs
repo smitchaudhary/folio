@@ -157,13 +157,15 @@ impl Item {
 
     pub fn format_for_list(&self, index: usize) -> String {
         let name_display = if self.name.len() > 28 {
-            format!("{}..", &self.name[..26])
+            let end = self.name.floor_char_boundary(26);
+            format!("{}..", &self.name[..end])
         } else {
             self.name.clone()
         };
 
         let author_display = if self.author.len() > 13 {
-            format!("{}..", &self.author[..11])
+            let end = self.author.floor_char_boundary(11);
+            format!("{}..", &self.author[..end])
         } else {
             self.author.clone()
         };
