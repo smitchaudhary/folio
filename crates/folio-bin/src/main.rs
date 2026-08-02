@@ -114,33 +114,8 @@ async fn handle_list_command(
     let view_is_empty = items.is_empty();
 
     let filtered_items: Vec<_> = items
-        .into_iter()
-        .filter(|item| {
-            if let Some(status_filters) = status_filters
-                && !status_filters.is_empty()
-            {
-                let matches = status_filters.iter().any(|s| {
-                    Status::from_str(&s.to_lowercase()).is_ok_and(|status| status == item.status)
-                });
-                if !matches {
-                    return false;
-                }
-            }
-
-            if let Some(type_filters) = type_filters
-                && !type_filters.is_empty()
-            {
-                let matches = type_filters.iter().any(|t| {
-                    ItemType::from_str(&t.to_lowercase())
-                        .is_ok_and(|item_type| item_type == item.item_type)
-                });
-                if !matches {
-                    return false;
-                }
-            }
-
-            true
-        })
+        .iter()
+        .filter(|item| matches_filters(item, status_filters, type_filters))
         .collect();
 
     if filtered_items.is_empty() {
@@ -159,10 +134,43 @@ async fn handle_list_command(
     println!("{}", folio_core::Item::format_list_header());
     println!("{}", folio_core::Item::format_list_separator());
 
-    for (index, item) in filtered_items.iter().enumerate() {
-        println!("{}", item.format_for_list(index + 1));
+    for (pos, item) in items.iter().enumerate() {
+        if matches_filters(item, status_filters, type_filters) {
+            println!("{}", item.format_for_list(pos + 1));
+        }
     }
     Ok(())
+}
+
+fn matches_filters(
+    item: &folio_core::Item,
+    status_filters: Option<&[String]>,
+    type_filters: Option<&[String]>,
+) -> bool {
+    if let Some(status_filters) = status_filters
+        && !status_filters.is_empty()
+    {
+        let matches = status_filters.iter().any(|s| {
+            Status::from_str(&s.to_lowercase()).is_ok_and(|status| status == item.status)
+        });
+        if !matches {
+            return false;
+        }
+    }
+
+    if let Some(type_filters) = type_filters
+        && !type_filters.is_empty()
+    {
+        let matches = type_filters.iter().any(|t| {
+            ItemType::from_str(&t.to_lowercase())
+                .is_ok_and(|item_type| item_type == item.item_type)
+        });
+        if !matches {
+            return false;
+        }
+    }
+
+    true
 }
 
 async fn handle_set_status_command(
