@@ -90,24 +90,28 @@ folio list --type video       # Filter by type (within the chosen view)
 folio list --status todo      # Filter by status
 
 # Update status
-folio set-status 1 done       # Mark item #1 as done
-folio set-status 2 doing      # Mark item #2 as in progress
+folio set-status 1 done            # Mark item #1 as done (moves it to archive)
+folio set-status --archive 1 todo  # Restore archived item #1 to the inbox
 
 # Edit items
-folio edit 1                  # Edit item #1 interactively
+folio edit 1                       # Edit item #1 interactively
+folio edit --archive 1             # Edit archived item #1
 
 # Remove items
-folio delete 1                # Delete item #1
-folio archive 1               # Move to archive
+folio delete 1                     # Delete item #1
+folio delete --archive 1           # Delete archived item #1
+folio archive 1                    # Move to archive
 
 # Manage references
-folio mark-ref 1              # Mark/unmark as reference
+folio mark-ref --archive 1         # Mark/unmark archived item #1 as reference
 
 # Config
 folio config list             # Show current config
 folio config set max_items 50 # Set inbox limit
 folio config set archive_on_overflow todo  # Auto-archive oldest todo items
 ```
+
+> **IDs** are positions within the current view (inbox by default, archive with `--archive`). Filtered lists show true positions with gaps, so any ID you see in a list works directly in a command.
 
 ### Status
 
