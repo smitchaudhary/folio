@@ -2,6 +2,7 @@ use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::str::FromStr;
 use strum::EnumString;
+use uuid::Uuid;
 
 mod error;
 pub use error::{CapError, CoreError};
@@ -74,6 +75,8 @@ impl Kind {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Item {
+    #[serde(default)]
+    pub id: String,
     pub name: String,
     #[serde(rename = "type")]
     pub item_type: ItemType,
@@ -220,6 +223,7 @@ pub fn create_item(
     };
 
     let item = Item {
+        id: Uuid::new_v4().to_string(),
         name,
         item_type: parsed_type,
         status: Status::Todo,

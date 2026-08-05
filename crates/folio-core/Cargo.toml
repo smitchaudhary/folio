@@ -9,3 +9,4 @@ strum = { workspace = true }
 chrono = { workspace = true }
 thiserror = { workspace = true }
 serde_json = { workspace = true }
+uuid = { workspace = true }
