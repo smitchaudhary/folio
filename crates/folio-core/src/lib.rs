@@ -145,8 +145,8 @@ impl Status {
 }
 
 impl Item {
-    pub fn id(&self) -> usize {
-        self.added_at.timestamp_micros() as usize
+    pub fn id(&self) -> &str {
+        &self.id
     }
 
     pub fn validate(&self) -> Result<(), CoreError> {
@@ -268,7 +268,7 @@ pub struct StatusUpdateResult {
 }
 
 pub fn update_item_status(
-    stable_id: usize,
+    stable_id: &str,
     new_status: Status,
     mut inbox_items: Vec<Item>,
     mut archive_items: Vec<Item>,

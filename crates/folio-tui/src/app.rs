@@ -388,7 +388,7 @@ impl App {
                     View::Inbox => self.state.current_view = View::Archive,
                     View::Archive => self.state.current_view = View::Inbox,
                 }
-                self.state.selected_item_id = self.state.visible_items().first().map(|(id, _)| *id);
+                self.state.selected_item_id = self.state.visible_items().first().map(|(id, _)| id.clone());
                 self.table_state.select(self.state.selected_table_row());
                 self.show_status_message(
                     match self.state.current_view {
@@ -577,7 +577,7 @@ impl App {
     }
 
     async fn delete_selected_item(&mut self) {
-        let selected_id = match self.state.selected_item_id {
+        let selected_id = match self.state.selected_item_id.clone() {
             Some(id) => id,
             None => return,
         };
@@ -619,7 +619,7 @@ impl App {
         }
     }
 
-    async fn submit_add_form(&mut self) -> Option<usize> {
+    async fn submit_add_form(&mut self) -> Option<String> {
         let name = self
             .add_form
             .get_field_value("name")
@@ -662,7 +662,7 @@ impl App {
             Err(_) => return None,
         };
 
-        let item_id = new_item.id();
+        let item_id = new_item.id.clone();
 
         match ConfigManager::new() {
             Ok(config_manager) => {

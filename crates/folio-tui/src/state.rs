@@ -9,7 +9,7 @@ pub enum View {
 pub struct AppState {
     pub inbox_items: Vec<Item>,
     pub archive_items: Vec<Item>,
-    pub selected_item_id: Option<usize>,
+    pub selected_item_id: Option<String>,
     pub current_view: View,
     pub filter: Option<String>,
 }
@@ -33,7 +33,7 @@ impl AppState {
 
     pub fn load_inbox_items(&mut self, items: Vec<Item>) {
         self.inbox_items = items;
-        self.selected_item_id = self.inbox_items.first().map(|item| item.id());
+        self.selected_item_id = self.inbox_items.first().map(|item| item.id.clone());
     }
 
     pub fn load_archive_items(&mut self, items: Vec<Item>) {
@@ -55,14 +55,14 @@ impl AppState {
     }
 
     pub fn selected_item(&self) -> Option<&Item> {
-        let selected_id = self.selected_item_id?;
+        let selected_id = self.selected_item_id.as_ref()?;
         self.current_items()
             .iter()
             .find(|item| item.id() == selected_id)
     }
 
     pub fn selected_item_mut(&mut self) -> Option<&mut Item> {
-        let selected_id = self.selected_item_id?;
+        let selected_id = self.selected_item_id.clone()?;
         self.current_items_mut()
             .iter_mut()
             .find(|item| item.id() == selected_id)
@@ -87,111 +87,111 @@ impl AppState {
     }
 
     pub fn next_item(&mut self) {
-        let visible: Vec<usize> = self.visible_items().into_iter().map(|(id, _)| id).collect();
+        let visible: Vec<String> = self.visible_items().into_iter().map(|(id, _)| id).collect();
 
         if visible.is_empty() {
             self.selected_item_id = None;
             return;
         }
 
-        match self.selected_item_id {
+        match &self.selected_item_id {
             None => {
-                self.selected_item_id = visible.first().copied();
+                self.selected_item_id = visible.first().cloned();
             }
             Some(current_id) => {
-                if let Some(pos) = visible.iter().position(|&id| id == current_id) {
+                if let Some(pos) = visible.iter().position(|id| id == current_id) {
                     let next_pos = (pos + 1).min(visible.len() - 1);
-                    self.selected_item_id = visible.get(next_pos).copied();
+                    self.selected_item_id = visible.get(next_pos).cloned();
                 } else {
-                    self.selected_item_id = visible.first().copied();
+                    self.selected_item_id = visible.first().cloned();
                 }
             }
         }
     }
 
     pub fn previous_item(&mut self) {
-        let visible: Vec<usize> = self.visible_items().into_iter().map(|(id, _)| id).collect();
+        let visible: Vec<String> = self.visible_items().into_iter().map(|(id, _)| id).collect();
 
         if visible.is_empty() {
             self.selected_item_id = None;
             return;
         }
 
-        match self.selected_item_id {
+        match &self.selected_item_id {
             None => {
-                self.selected_item_id = visible.first().copied();
+                self.selected_item_id = visible.first().cloned();
             }
             Some(current_id) => {
-                if let Some(pos) = visible.iter().position(|&id| id == current_id) {
+                if let Some(pos) = visible.iter().position(|id| id == current_id) {
                     let prev_pos = pos.saturating_sub(1);
-                    self.selected_item_id = visible.get(prev_pos).copied();
+                    self.selected_item_id = visible.get(prev_pos).cloned();
                 } else {
-                    self.selected_item_id = visible.first().copied();
+                    self.selected_item_id = visible.first().cloned();
                 }
             }
         }
     }
 
     pub fn next_page(&mut self, page_size: usize) {
-        let visible: Vec<usize> = self.visible_items().into_iter().map(|(id, _)| id).collect();
+        let visible: Vec<String> = self.visible_items().into_iter().map(|(id, _)| id).collect();
 
         if visible.is_empty() {
             self.selected_item_id = None;
             return;
         }
 
-        match self.selected_item_id {
+        match &self.selected_item_id {
             None => {
-                self.selected_item_id = visible.first().copied();
+                self.selected_item_id = visible.first().cloned();
             }
             Some(current_id) => {
-                if let Some(pos) = visible.iter().position(|&id| id == current_id) {
+                if let Some(pos) = visible.iter().position(|id| id == current_id) {
                     let next_pos = (pos + page_size).min(visible.len() - 1);
-                    self.selected_item_id = visible.get(next_pos).copied();
+                    self.selected_item_id = visible.get(next_pos).cloned();
                 } else {
-                    self.selected_item_id = visible.first().copied();
+                    self.selected_item_id = visible.first().cloned();
                 }
             }
         }
     }
 
     pub fn previous_page(&mut self, page_size: usize) {
-        let visible: Vec<usize> = self.visible_items().into_iter().map(|(id, _)| id).collect();
+        let visible: Vec<String> = self.visible_items().into_iter().map(|(id, _)| id).collect();
 
         if visible.is_empty() {
             self.selected_item_id = None;
             return;
         }
 
-        match self.selected_item_id {
+        match &self.selected_item_id {
             None => {
-                self.selected_item_id = visible.first().copied();
+                self.selected_item_id = visible.first().cloned();
             }
             Some(current_id) => {
-                if let Some(pos) = visible.iter().position(|&id| id == current_id) {
+                if let Some(pos) = visible.iter().position(|id| id == current_id) {
                     let prev_pos = pos.saturating_sub(page_size);
-                    self.selected_item_id = visible.get(prev_pos).copied();
+                    self.selected_item_id = visible.get(prev_pos).cloned();
                 } else {
-                    self.selected_item_id = visible.first().copied();
+                    self.selected_item_id = visible.first().cloned();
                 }
             }
         }
     }
 
     pub fn jump_to_first(&mut self) {
-        let visible: Vec<usize> = self.visible_items().into_iter().map(|(id, _)| id).collect();
+        let visible: Vec<String> = self.visible_items().into_iter().map(|(id, _)| id).collect();
 
-        self.selected_item_id = visible.first().copied();
+        self.selected_item_id = visible.first().cloned();
     }
 
     pub fn jump_to_last(&mut self) {
-        let visible: Vec<usize> = self.visible_items().into_iter().map(|(id, _)| id).collect();
+        let visible: Vec<String> = self.visible_items().into_iter().map(|(id, _)| id).collect();
 
-        self.selected_item_id = visible.last().copied();
+        self.selected_item_id = visible.last().cloned();
     }
 
     pub fn move_item_up(&mut self) -> Result<(), CoreError> {
-        let selected_id = self.selected_item_id.ok_or(CoreError::ItemNotFound)?;
+        let selected_id = self.selected_item_id.clone().ok_or(CoreError::ItemNotFound)?;
         let items = self.current_items_mut();
 
         let pos = items
@@ -208,7 +208,7 @@ impl AppState {
     }
 
     pub fn move_item_down(&mut self) -> Result<(), CoreError> {
-        let selected_id = self.selected_item_id.ok_or(CoreError::ItemNotFound)?;
+        let selected_id = self.selected_item_id.clone().ok_or(CoreError::ItemNotFound)?;
         let items = self.current_items_mut();
 
         let pos = items
@@ -239,27 +239,27 @@ impl AppState {
     pub fn set_filter(&mut self, filter: Option<String>) {
         self.filter = filter;
 
-        if let Some(selected_id) = self.selected_item_id {
+        if let Some(selected_id) = self.selected_item_id.as_ref() {
             let still_visible = self
                 .visible_items()
                 .iter()
-                .any(|(id, _)| *id == selected_id);
+                .any(|(id, _)| id == selected_id);
 
             if !still_visible {
-                self.selected_item_id = self.visible_items().first().map(|(id, _)| *id);
+                self.selected_item_id = self.visible_items().first().map(|(id, _)| id.clone());
             }
         } else {
-            self.selected_item_id = self.visible_items().first().map(|(id, _)| *id);
+            self.selected_item_id = self.visible_items().first().map(|(id, _)| id.clone());
         }
     }
 
-    pub fn visible_items(&self) -> Vec<(usize, &Item)> {
+    pub fn visible_items(&self) -> Vec<(String, &Item)> {
         let items = self.current_items();
 
         items
             .iter()
             .filter(|item| self.matches_filter(item))
-            .map(|item| (item.id(), item))
+            .map(|item| (item.id.clone(), item))
             .collect()
     }
 
@@ -275,15 +275,15 @@ impl AppState {
     }
 
     pub fn selected_table_row(&self) -> Option<usize> {
-        let selected_id = self.selected_item_id?;
+        let selected_id = self.selected_item_id.as_ref()?;
 
         self.visible_items()
             .iter()
-            .position(|(id, _)| *id == selected_id)
+            .position(|(id, _)| id == selected_id)
     }
 
     pub fn reselect_visible_row(&mut self, preferred_row: Option<usize>) {
-        let visible: Vec<usize> = self.visible_items().into_iter().map(|(id, _)| id).collect();
+        let visible: Vec<String> = self.visible_items().into_iter().map(|(id, _)| id).collect();
 
         if visible.is_empty() {
             self.selected_item_id = None;
@@ -291,14 +291,14 @@ impl AppState {
         }
 
         let idx = preferred_row.unwrap_or(0).min(visible.len() - 1);
-        self.selected_item_id = visible.get(idx).copied();
+        self.selected_item_id = visible.get(idx).cloned();
     }
 
     fn change_selected_status(
         &mut self,
         new_status: Status,
     ) -> Result<StatusUpdateResult, CoreError> {
-        let selected_id = self.selected_item_id.ok_or(CoreError::ItemNotFound)?;
+        let selected_id = self.selected_item_id.as_ref().ok_or(CoreError::ItemNotFound)?;
         let previous_row = self.selected_table_row();
 
         let config_manager = folio_storage::ConfigManager::new()

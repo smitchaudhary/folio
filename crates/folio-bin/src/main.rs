@@ -194,11 +194,11 @@ async fn handle_set_status_command(
         &inbox_items
     };
     let index = resolve_item_index(id, view_items.len())?;
-    let stable_id = view_items[index].id();
+    let stable_id = view_items[index].id().to_string();
 
     let config = config_manager.get();
     let result =
-        folio_core::update_item_status(stable_id, new_status, inbox_items, archive_items, config)?;
+        folio_core::update_item_status(&stable_id, new_status, inbox_items, archive_items, config)?;
 
     if !result.item_found {
         return Err(CliError::ItemNotFound { id });
