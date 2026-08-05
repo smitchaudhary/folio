@@ -26,17 +26,25 @@ enum Commands {
 fn main() {
     let cli = Cli::parse();
     match cli.command {
-        Commands::Serve { bind, db } => match db::open(&db) {
-            Ok((_conn, db_path)) => {
-                println!("database opened at {}", db_path.display());
-                println!("bind: {bind}");
-                println!("Not implemented yet");
-            }
-            Err(e) => {
-                eprintln!("failed to open database: {e}");
+        Commands::Serve { bind, db } => {
+            let (conn, db_path) = match db::open(&db) {
+                Ok(v) => v,
+                Err(e) => {
+                    eprintln!("failed to open database: {e}");
+                    std::process::exit(1);
+                }
+            };
+            println!("database opened at {}", db_path.display());
+
+            if let Err(e) = db::init_schema(&conn) {
+                eprintln!("failed to initialize schema: {e}");
                 std::process::exit(1);
             }
-        },
+            println!("schema initialized");
+
+            println!("bind: {bind}");
+            println!("Not implemented yet");
+        }
         Commands::Import => println!("Not implemented yet"),
     }
 }
