@@ -1,10 +1,26 @@
 mod db;
+mod types;
 
+use axum::extract::{Query, State};
+use axum::http::StatusCode;
 use axum::routing::get;
 use axum::{Json, Router};
 use clap::{Parser, Subcommand};
+use rusqlite::Connection;
+use serde::Deserialize;
 use std::net::SocketAddr;
 use std::path::{Path, PathBuf};
+use std::sync::{Arc, Mutex};
+
+#[derive(Clone)]
+struct AppState {
+    conn: Arc<Mutex<Connection>>,
+}
+
+#[derive(Deserialize)]
+struct ListParams {
+    view: Option<types::View>,
+}
 
 #[derive(Parser)]
 #[command(name = "folio-server", about = "Folio server", version = "0.1.0")]
@@ -50,7 +66,14 @@ async fn serve(bind: SocketAddr, db_arg: &Path) {
     }
     println!("schema initialized");
 
-    let app = Router::new().route("/api/health", get(health));
+    let state = AppState {
+        conn: Arc::new(Mutex::new(conn)),
+    };
+
+    let app = Router::new()
+        .route("/api/health", get(health))
+        .route("/api/items", get(list_items))
+        .with_state(state);
 
     let listener = match tokio::net::TcpListener::bind(bind).await {
         Ok(l) => l,
@@ -66,4 +89,16 @@ async fn serve(bind: SocketAddr, db_arg: &Path) {
 
 async fn health() -> Json<serde_json::Value> {
     Json(serde_json::json!({"status": "ok"}))
+}
+
+async fn list_items(
+    State(state): State<AppState>,
+    Query(params): Query<ListParams>,
+) -> Result<Json<Vec<types::ApiItem>>, StatusCode> {
+    let view = params.view.unwrap_or_default();
+    let conn = state.conn.lock().unwrap();
+    match db::load_items(&conn, view) {
+        Ok(items) => Ok(Json(items)),
+        Err(_) => Err(StatusCode::INTERNAL_SERVER_ERROR),
+    }
 }
