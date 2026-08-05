@@ -1,0 +1,11 @@
+[package]
+name = "folio-server"
+version = "0.1.0"
+edition = "2024"
+
+[[bin]]
+name = "folio-server"
+path = "src/main.rs"
+
+[dependencies]
+clap = { workspace = true }

@@ -567,6 +567,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "folio-server"
+version = "0.1.0"
+dependencies = [
+ "clap",
+]
+
+[[package]]
 name = "folio-storage"
 version = "0.1.0"
 dependencies = [
