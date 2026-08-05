@@ -22,6 +22,21 @@ struct ListParams {
     view: Option<types::View>,
 }
 
+#[derive(Deserialize)]
+struct AddItemRequest {
+    name: String,
+    #[serde(rename = "type", default)]
+    item_type: Option<String>,
+    #[serde(default)]
+    author: Option<String>,
+    #[serde(default)]
+    link: Option<String>,
+    #[serde(default)]
+    note: Option<String>,
+    #[serde(default)]
+    kind: Option<String>,
+}
+
 #[derive(Parser)]
 #[command(name = "folio-server", about = "Folio server", version = "0.1.0")]
 struct Cli {
@@ -72,7 +87,7 @@ async fn serve(bind: SocketAddr, db_arg: &Path) {
 
     let app = Router::new()
         .route("/api/health", get(health))
-        .route("/api/items", get(list_items))
+        .route("/api/items", get(list_items).post(add_item))
         .with_state(state);
 
     let listener = match tokio::net::TcpListener::bind(bind).await {
@@ -101,4 +116,56 @@ async fn list_items(
         Ok(items) => Ok(Json(items)),
         Err(_) => Err(StatusCode::INTERNAL_SERVER_ERROR),
     }
+}
+
+async fn add_item(
+    State(state): State<AppState>,
+    Json(body): Json<AddItemRequest>,
+) -> Result<(StatusCode, Json<serde_json::Value>), (StatusCode, Json<serde_json::Value>)> {
+    let new_item = match folio_core::create_item(
+        body.name,
+        body.item_type,
+        body.author,
+        body.link,
+        body.note,
+        body.kind,
+    ) {
+        Ok(item) => item,
+        Err(e) => {
+            return Err(error_response(
+                StatusCode::BAD_REQUEST,
+                "validation_error",
+                &e.to_string(),
+            ))
+        }
+    };
+
+    let mut conn = state.conn.lock().unwrap();
+    match db::add_item(&mut conn, new_item) {
+        Ok((item, overflow)) => Ok((
+            StatusCode::CREATED,
+            Json(serde_json::json!({ "item": item, "overflow": overflow })),
+        )),
+        Err(db::AddError::InboxFull) => Err(error_response(
+            StatusCode::CONFLICT,
+            "inbox_full",
+            "Inbox limit reached",
+        )),
+        Err(db::AddError::Other(e)) => Err(error_response(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "internal_error",
+            &e.to_string(),
+        )),
+    }
+}
+
+fn error_response(
+    status: StatusCode,
+    code: &str,
+    message: &str,
+) -> (StatusCode, Json<serde_json::Value>) {
+    (
+        status,
+        Json(serde_json::json!({ "error": { "code": code, "message": message } })),
+    )
 }

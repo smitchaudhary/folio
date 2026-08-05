@@ -1,7 +1,7 @@
 use crate::types::{ApiItem, View};
 use chrono::{DateTime, Utc};
-use folio_core::{ItemType, Kind, Status};
-use rusqlite::Connection;
+use folio_core::{ItemType, Kind, OverflowStrategy, Status};
+use rusqlite::{Connection, params};
 use std::path::{Path, PathBuf};
 use std::str::FromStr;
 
@@ -139,4 +139,115 @@ fn parse_ts(s: &str) -> Result<DateTime<Utc>, Box<dyn std::error::Error>> {
 
 fn parse_ts_opt(s: Option<String>) -> Result<Option<DateTime<Utc>>, Box<dyn std::error::Error>> {
     s.map(|v| parse_ts(&v)).transpose()
+}
+
+pub fn load_config(conn: &Connection) -> Result<folio_core::Config, Box<dyn std::error::Error>> {
+    let (max_items, strategy_str): (u32, String) = conn.query_row(
+        "SELECT max_items, archive_on_overflow FROM config WHERE id = 1",
+        [],
+        |row| Ok((row.get(0)?, row.get(1)?)),
+    )?;
+
+    let archive_on_overflow = match strategy_str.as_str() {
+        "abort" => OverflowStrategy::Abort,
+        "todo" => OverflowStrategy::Todo,
+        "any" => OverflowStrategy::Any,
+        other => return Err(format!("unknown overflow strategy: {other}").into()),
+    };
+
+    Ok(folio_core::Config {
+        max_items,
+        archive_on_overflow,
+        version: 1,
+    })
+}
+
+fn next_position(conn: &Connection, archive: bool) -> rusqlite::Result<i64> {
+    let sql = if archive {
+        "SELECT COALESCE(MAX(position), 0) + 1 FROM items WHERE status = 'done'"
+    } else {
+        "SELECT COALESCE(MAX(position), 0) + 1 FROM items WHERE status != 'done'"
+    };
+    conn.query_row(sql, [], |row| row.get(0))
+}
+
+pub enum AddError {
+    InboxFull,
+    Other(Box<dyn std::error::Error>),
+}
+
+pub fn add_item(
+    conn: &mut Connection,
+    mut new_item: folio_core::Item,
+) -> Result<(ApiItem, Vec<ApiItem>), AddError> {
+    let tx = conn.transaction().map_err(|e| AddError::Other(e.into()))?;
+    let config = load_config(&tx).map_err(|e| AddError::Other(e.into()))?;
+
+    let mut overflow_api = Vec::new();
+
+    if new_item.kind == folio_core::Kind::Reference {
+        new_item.status = folio_core::Status::Done;
+        folio_core::update_timestamps(&mut new_item);
+    } else {
+        let inbox_rows = load_items(&tx, View::Inbox).map_err(|e| AddError::Other(e.into()))?;
+        let inbox_core: Vec<folio_core::Item> =
+            inbox_rows.iter().cloned().map(Into::into).collect();
+
+        let (_, to_archive) = folio_core::add_item_to_inbox(inbox_core, new_item.clone(), &config)
+            .map_err(|e| match e {
+                folio_core::CoreError::InboxFull => AddError::InboxFull,
+                other => AddError::Other(other.into()),
+            })?;
+
+        let now = Utc::now();
+        for item in &to_archive {
+            let position = next_position(&tx, true).map_err(|e| AddError::Other(e.into()))?;
+            tx.execute(
+                "UPDATE items SET status = 'done', finished_at = ?1, position = ?2, updated_at = ?3 \
+                 WHERE id = ?4",
+                params![
+                    item.finished_at.map(|dt| dt.to_rfc3339()),
+                    position,
+                    now.to_rfc3339(),
+                    item.id,
+                ],
+            )
+            .map_err(|e| AddError::Other(e.into()))?;
+            overflow_api.push(ApiItem::from_core(item.clone()));
+        }
+    }
+
+    let api_item = ApiItem::from_core(new_item.clone());
+    let archive = api_item.status == folio_core::Status::Done;
+    let position = next_position(&tx, archive).map_err(|e| AddError::Other(e.into()))?;
+    let now = Utc::now();
+    let kind_str = match &api_item.kind {
+        folio_core::Kind::Normal => "normal",
+        folio_core::Kind::Reference => "reference",
+    };
+
+    tx.execute(
+        "INSERT INTO items (id, name, type, status, kind, author, link, note, added_at, started_at, \
+         finished_at, position, updated_at) \
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13)",
+        params![
+            &api_item.id,
+            &api_item.name,
+            api_item.item_type.as_string(),
+            api_item.status.as_string(),
+            kind_str,
+            &api_item.author,
+            &api_item.link,
+            &api_item.note,
+            api_item.added_at.to_rfc3339(),
+            api_item.started_at.map(|dt| dt.to_rfc3339()),
+            api_item.finished_at.map(|dt| dt.to_rfc3339()),
+            position,
+            now.to_rfc3339(),
+        ],
+    )
+    .map_err(|e| AddError::Other(e.into()))?;
+
+    tx.commit().map_err(|e| AddError::Other(e.into()))?;
+    Ok((api_item, overflow_api))
 }
