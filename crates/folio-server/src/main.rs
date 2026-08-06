@@ -1,15 +1,17 @@
 mod db;
 mod types;
 
-use axum::extract::{Query, State};
+use axum::extract::{Path as UrlPath, Query, State};
 use axum::http::StatusCode;
-use axum::routing::get;
+use axum::routing::{get, post};
 use axum::{Json, Router};
 use clap::{Parser, Subcommand};
+use folio_core::Status;
 use rusqlite::Connection;
 use serde::Deserialize;
 use std::net::SocketAddr;
 use std::path::{Path, PathBuf};
+use std::str::FromStr;
 use std::sync::{Arc, Mutex};
 
 #[derive(Clone)]
@@ -88,6 +90,7 @@ async fn serve(bind: SocketAddr, db_arg: &Path) {
     let app = Router::new()
         .route("/api/health", get(health))
         .route("/api/items", get(list_items).post(add_item))
+        .route("/api/items/{id}/status", post(update_item_status))
         .with_state(state);
 
     let listener = match tokio::net::TcpListener::bind(bind).await {
@@ -146,12 +149,13 @@ async fn add_item(
             StatusCode::CREATED,
             Json(serde_json::json!({ "item": item, "overflow": overflow })),
         )),
-        Err(db::AddError::InboxFull) => Err(error_response(
+        Err(db::DbError::InboxFull) => Err(error_response(
             StatusCode::CONFLICT,
             "inbox_full",
             "Inbox limit reached",
         )),
-        Err(db::AddError::Other(e)) => Err(error_response(
+        Err(db::DbError::NotFound) => unreachable!("add_item never returns NotFound"),
+        Err(db::DbError::Other(e)) => Err(error_response(
             StatusCode::INTERNAL_SERVER_ERROR,
             "internal_error",
             &e.to_string(),
@@ -168,4 +172,57 @@ fn error_response(
         status,
         Json(serde_json::json!({ "error": { "code": code, "message": message } })),
     )
+}
+
+#[derive(Deserialize)]
+struct UpdateStatusRequest {
+    status: String,
+}
+
+async fn update_item_status(
+    State(state): State<AppState>,
+    UrlPath(id): UrlPath<String>,
+    Json(body): Json<UpdateStatusRequest>,
+) -> Result<(StatusCode, Json<serde_json::Value>), (StatusCode, Json<serde_json::Value>)> {
+    let new_status = match Status::from_str(&body.status) {
+        Ok(s) => s,
+        Err(_) => {
+            return Err(error_response(
+                StatusCode::BAD_REQUEST,
+                "invalid_status",
+                &format!(
+                    "Invalid status '{}'. Valid options are: todo, doing, done",
+                    body.status
+                ),
+            ))
+        }
+    };
+
+    let mut conn = state.conn.lock().unwrap();
+    match db::update_item_status(&mut conn, &id, new_status) {
+        Ok(result) => Ok((
+            StatusCode::OK,
+            Json(serde_json::json!({
+                "item": result.item,
+                "moved_to_archive": result.moved_to_archive,
+                "moved_to_inbox": result.moved_to_inbox,
+                "overflow": result.overflow,
+            })),
+        )),
+        Err(db::DbError::NotFound) => Err(error_response(
+            StatusCode::NOT_FOUND,
+            "not_found",
+            &format!("Item {id} not found"),
+        )),
+        Err(db::DbError::InboxFull) => Err(error_response(
+            StatusCode::CONFLICT,
+            "inbox_full",
+            "Inbox limit reached",
+        )),
+        Err(db::DbError::Other(e)) => Err(error_response(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "internal_error",
+            &e.to_string(),
+        )),
+    }
 }

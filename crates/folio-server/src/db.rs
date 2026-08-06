@@ -171,7 +171,8 @@ fn next_position(conn: &Connection, archive: bool) -> rusqlite::Result<i64> {
     conn.query_row(sql, [], |row| row.get(0))
 }
 
-pub enum AddError {
+pub enum DbError {
+    NotFound,
     InboxFull,
     Other(Box<dyn std::error::Error>),
 }
@@ -179,9 +180,9 @@ pub enum AddError {
 pub fn add_item(
     conn: &mut Connection,
     mut new_item: folio_core::Item,
-) -> Result<(ApiItem, Vec<ApiItem>), AddError> {
-    let tx = conn.transaction().map_err(|e| AddError::Other(e.into()))?;
-    let config = load_config(&tx).map_err(|e| AddError::Other(e.into()))?;
+) -> Result<(ApiItem, Vec<ApiItem>), DbError> {
+    let tx = conn.transaction().map_err(|e| DbError::Other(e.into()))?;
+    let config = load_config(&tx).map_err(|e| DbError::Other(e.into()))?;
 
     let mut overflow_api = Vec::new();
 
@@ -189,19 +190,19 @@ pub fn add_item(
         new_item.status = folio_core::Status::Done;
         folio_core::update_timestamps(&mut new_item);
     } else {
-        let inbox_rows = load_items(&tx, View::Inbox).map_err(|e| AddError::Other(e.into()))?;
+        let inbox_rows = load_items(&tx, View::Inbox).map_err(|e| DbError::Other(e.into()))?;
         let inbox_core: Vec<folio_core::Item> =
             inbox_rows.iter().cloned().map(Into::into).collect();
 
         let (_, to_archive) = folio_core::add_item_to_inbox(inbox_core, new_item.clone(), &config)
             .map_err(|e| match e {
-                folio_core::CoreError::InboxFull => AddError::InboxFull,
-                other => AddError::Other(other.into()),
+                folio_core::CoreError::InboxFull => DbError::InboxFull,
+                other => DbError::Other(other.into()),
             })?;
 
         let now = Utc::now();
         for item in &to_archive {
-            let position = next_position(&tx, true).map_err(|e| AddError::Other(e.into()))?;
+            let position = next_position(&tx, true).map_err(|e| DbError::Other(e.into()))?;
             tx.execute(
                 "UPDATE items SET status = 'done', finished_at = ?1, position = ?2, updated_at = ?3 \
                  WHERE id = ?4",
@@ -212,14 +213,14 @@ pub fn add_item(
                     item.id,
                 ],
             )
-            .map_err(|e| AddError::Other(e.into()))?;
+            .map_err(|e| DbError::Other(e.into()))?;
             overflow_api.push(ApiItem::from_core(item.clone()));
         }
     }
 
     let api_item = ApiItem::from_core(new_item.clone());
     let archive = api_item.status == folio_core::Status::Done;
-    let position = next_position(&tx, archive).map_err(|e| AddError::Other(e.into()))?;
+    let position = next_position(&tx, archive).map_err(|e| DbError::Other(e.into()))?;
     let now = Utc::now();
     let kind_str = match &api_item.kind {
         folio_core::Kind::Normal => "normal",
@@ -246,8 +247,101 @@ pub fn add_item(
             now.to_rfc3339(),
         ],
     )
-    .map_err(|e| AddError::Other(e.into()))?;
+    .map_err(|e| DbError::Other(e.into()))?;
 
-    tx.commit().map_err(|e| AddError::Other(e.into()))?;
+    tx.commit().map_err(|e| DbError::Other(e.into()))?;
     Ok((api_item, overflow_api))
+}
+
+pub struct StatusResult {
+    pub item: ApiItem,
+    pub moved_to_archive: bool,
+    pub moved_to_inbox: bool,
+    pub overflow: Vec<ApiItem>,
+}
+
+pub fn update_item_status(
+    conn: &mut Connection,
+    id: &str,
+    new_status: folio_core::Status,
+) -> Result<StatusResult, DbError> {
+    let tx = conn.transaction().map_err(|e| DbError::Other(e.into()))?;
+    let config = load_config(&tx).map_err(|e| DbError::Other(e.into()))?;
+
+    let inbox_rows = load_items(&tx, View::Inbox).map_err(|e| DbError::Other(e.into()))?;
+    let archive_rows = load_items(&tx, View::Archive).map_err(|e| DbError::Other(e.into()))?;
+    let inbox_core: Vec<folio_core::Item> = inbox_rows.iter().cloned().map(Into::into).collect();
+    let archive_core: Vec<folio_core::Item> = archive_rows.iter().cloned().map(Into::into).collect();
+
+    let result = folio_core::update_item_status(id, new_status, inbox_core, archive_core, &config)
+        .map_err(|e| match e {
+            folio_core::CoreError::InboxFull => DbError::InboxFull,
+            other => DbError::Other(other.into()),
+        })?;
+
+    if !result.item_found {
+        return Err(DbError::NotFound);
+    }
+
+    let target = result
+        .inbox_items
+        .iter()
+        .chain(result.archive_items.iter())
+        .find(|item| item.id == id)
+        .ok_or(DbError::NotFound)?;
+
+    let now = Utc::now();
+    let target_archive = target.status == folio_core::Status::Done;
+    let crossed_views = !result.moved_to_archive.is_empty() || result.moved_to_inbox;
+
+    let current_pos: i64 = tx
+        .query_row("SELECT position FROM items WHERE id = ?1", [id], |row| {
+            row.get(0)
+        })
+        .map_err(|e| DbError::Other(e.into()))?;
+    let position = if crossed_views {
+        next_position(&tx, target_archive).map_err(|e| DbError::Other(e.into()))?
+    } else {
+        current_pos
+    };
+
+    tx.execute(
+        "UPDATE items SET status = ?1, started_at = ?2, finished_at = ?3, position = ?4, \
+         updated_at = ?5 WHERE id = ?6",
+        params![
+            target.status.as_string(),
+            target.started_at.map(|dt| dt.to_rfc3339()),
+            target.finished_at.map(|dt| dt.to_rfc3339()),
+            position,
+            now.to_rfc3339(),
+            id,
+        ],
+    )
+    .map_err(|e| DbError::Other(e.into()))?;
+
+    let mut overflow_api = Vec::new();
+    for item in &result.overflow_items {
+        let position = next_position(&tx, true).map_err(|e| DbError::Other(e.into()))?;
+        tx.execute(
+            "UPDATE items SET status = 'done', finished_at = ?1, position = ?2, updated_at = ?3 \
+             WHERE id = ?4",
+            params![
+                item.finished_at.map(|dt| dt.to_rfc3339()),
+                position,
+                now.to_rfc3339(),
+                item.id,
+            ],
+        )
+        .map_err(|e| DbError::Other(e.into()))?;
+        overflow_api.push(ApiItem::from_core(item.clone()));
+    }
+
+    tx.commit().map_err(|e| DbError::Other(e.into()))?;
+
+    Ok(StatusResult {
+        item: ApiItem::from_core(target.clone()),
+        moved_to_archive: !result.moved_to_archive.is_empty(),
+        moved_to_inbox: result.moved_to_inbox,
+        overflow: overflow_api,
+    })
 }
