@@ -174,6 +174,8 @@ fn next_position(conn: &Connection, archive: bool) -> rusqlite::Result<i64> {
 pub enum DbError {
     NotFound,
     InboxFull,
+    Validation(String),
+    NotArchived,
     Other(Box<dyn std::error::Error>),
 }
 
@@ -344,4 +346,120 @@ pub fn update_item_status(
         moved_to_inbox: result.moved_to_inbox,
         overflow: overflow_api,
     })
+}
+
+pub fn edit_item(
+    conn: &mut Connection,
+    id: &str,
+    name: Option<String>,
+    item_type: Option<String>,
+    author: Option<String>,
+    link: Option<String>,
+    note: Option<String>,
+) -> Result<ApiItem, DbError> {
+    let tx = conn.transaction().map_err(|e| DbError::Other(e.into()))?;
+    let all_rows = load_items(&tx, View::All).map_err(|e| DbError::Other(e.into()))?;
+    let item = all_rows
+        .iter()
+        .find(|row| row.id == id)
+        .cloned()
+        .ok_or(DbError::NotFound)?;
+
+    let mut core_item: folio_core::Item = item.into();
+    if let Some(name) = name {
+        core_item.name = name;
+    }
+    if let Some(item_type) = item_type {
+        core_item.item_type = ItemType::from_str(&item_type).unwrap_or(ItemType::BlogPost);
+    }
+    if let Some(author) = author {
+        core_item.author = author;
+    }
+    if let Some(link) = link {
+        core_item.link = link;
+    }
+    if let Some(note) = note {
+        core_item.note = note;
+    }
+
+    core_item
+        .validate()
+        .map_err(|e| DbError::Validation(e.to_string()))?;
+
+    let updated = ApiItem::from_core(core_item);
+    let now = Utc::now();
+    let kind_str = match &updated.kind {
+        folio_core::Kind::Normal => "normal",
+        folio_core::Kind::Reference => "reference",
+    };
+
+    tx.execute(
+        "UPDATE items SET name = ?1, type = ?2, status = ?3, kind = ?4, author = ?5, link = ?6, \
+         note = ?7, added_at = ?8, started_at = ?9, finished_at = ?10, updated_at = ?11 \
+         WHERE id = ?12",
+        params![
+            &updated.name,
+            updated.item_type.as_string(),
+            updated.status.as_string(),
+            kind_str,
+            &updated.author,
+            &updated.link,
+            &updated.note,
+            updated.added_at.to_rfc3339(),
+            updated.started_at.map(|dt| dt.to_rfc3339()),
+            updated.finished_at.map(|dt| dt.to_rfc3339()),
+            now.to_rfc3339(),
+            id,
+        ],
+    )
+    .map_err(|e| DbError::Other(e.into()))?;
+
+    tx.commit().map_err(|e| DbError::Other(e.into()))?;
+    Ok(updated)
+}
+
+pub fn delete_item(conn: &mut Connection, id: &str) -> Result<(), DbError> {
+    let tx = conn.transaction().map_err(|e| DbError::Other(e.into()))?;
+    let deleted = tx
+        .execute("DELETE FROM items WHERE id = ?1", [id])
+        .map_err(|e| DbError::Other(e.into()))?;
+    if deleted == 0 {
+        return Err(DbError::NotFound);
+    }
+    tx.commit().map_err(|e| DbError::Other(e.into()))?;
+    Ok(())
+}
+
+pub fn toggle_kind(conn: &mut Connection, id: &str) -> Result<ApiItem, DbError> {
+    let tx = conn.transaction().map_err(|e| DbError::Other(e.into()))?;
+    let all_rows = load_items(&tx, View::All).map_err(|e| DbError::Other(e.into()))?;
+    let mut item = all_rows
+        .iter()
+        .find(|row| row.id == id)
+        .cloned()
+        .ok_or(DbError::NotFound)?;
+
+    if item.status != folio_core::Status::Done {
+        return Err(DbError::NotArchived);
+    }
+
+    item.kind = match item.kind {
+        folio_core::Kind::Normal => folio_core::Kind::Reference,
+        folio_core::Kind::Reference => folio_core::Kind::Normal,
+    };
+
+    let kind_str = match &item.kind {
+        folio_core::Kind::Normal => "normal",
+        folio_core::Kind::Reference => "reference",
+    };
+    let now = Utc::now();
+
+    tx.execute(
+        "UPDATE items SET kind = ?1, updated_at = ?2 WHERE id = ?3",
+        params![kind_str, now.to_rfc3339(), id],
+    )
+    .map_err(|e| DbError::Other(e.into()))?;
+
+    tx.commit().map_err(|e| DbError::Other(e.into()))?;
+    Ok(item)
 }
