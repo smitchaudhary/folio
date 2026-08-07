@@ -45,6 +45,16 @@ fn main() {
         .expect("edit_item");
     println!("edited author: {}", edited.author);
 
+    // reorder: add two items, move the first down, check the order
+    let (order_one, _) = client.add_item(AddItemRequest::new("Order One")).expect("add");
+    let (order_two, _) = client.add_item(AddItemRequest::new("Order Two")).expect("add");
+    client.move_item(&order_one.id, "down").expect("move down");
+    let inbox = client.list_items(View::Inbox).expect("list");
+    let names: Vec<&str> = inbox.iter().map(|i| i.name.as_str()).collect();
+    println!("order: {}", names.join(", "));
+    client.delete_item(&order_one.id).expect("delete");
+    client.delete_item(&order_two.id).expect("delete");
+
     client.delete_item(&id).expect("delete_item");
     println!("deleted");
 

@@ -155,6 +155,16 @@ impl Client {
         }
     }
 
+    pub fn move_item(&self, id: &str, direction: &str) -> Result<folio_core::Item, ClientError> {
+        let body = serde_json::json!({ "direction": direction }).to_string();
+        let (status, resp_body) = self.post(&format!("/api/items/{id}/move"), &body)?;
+        if status == 200 {
+            parse_item_response(&resp_body)
+        } else {
+            Err(self.error_from_status(status, &resp_body))
+        }
+    }
+
     pub fn get_config(&self) -> Result<folio_core::Config, ClientError> {
         let (status, body) = self.get("/api/config")?;
         self.check_status(200, status, &body)?;

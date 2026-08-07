@@ -92,6 +92,7 @@ async fn serve(bind: SocketAddr, db_arg: &Path) {
         .route("/api/items/{id}/status", post(update_item_status))
         .route("/api/items/{id}", patch(edit_item).delete(delete_item))
         .route("/api/items/{id}/kind", post(toggle_kind))
+        .route("/api/items/{id}/move", post(move_item))
         .route("/api/config", get(get_config).put(update_config))
         .with_state(state);
 
@@ -173,6 +174,11 @@ fn db_error_response(id: &str, e: db::DbError) -> (StatusCode, Json<serde_json::
             "not_archived",
             "Only archived items can be marked as references",
         ),
+        db::DbError::AlreadyAtEdge => error_response(
+            StatusCode::BAD_REQUEST,
+            "already_at_edge",
+            "Item is already at the edge of its list",
+        ),
         db::DbError::InboxOverCap(count) => error_response(
             StatusCode::BAD_REQUEST,
             "inbox_over_cap",
@@ -229,6 +235,35 @@ async fn delete_item(
     let mut conn = state.conn.lock().unwrap();
     match db::delete_item(&mut conn, &id) {
         Ok(()) => Ok(StatusCode::NO_CONTENT),
+        Err(e) => Err(db_error_response(&id, e)),
+    }
+}
+
+#[derive(Deserialize)]
+struct MoveItemRequest {
+    direction: String,
+}
+
+async fn move_item(
+    State(state): State<AppState>,
+    UrlPath(id): UrlPath<String>,
+    Json(body): Json<MoveItemRequest>,
+) -> Result<(StatusCode, Json<serde_json::Value>), (StatusCode, Json<serde_json::Value>)> {
+    let direction = match body.direction.as_str() {
+        "up" => db::MoveDirection::Up,
+        "down" => db::MoveDirection::Down,
+        _ => {
+            return Err(error_response(
+                StatusCode::BAD_REQUEST,
+                "invalid_direction",
+                "Valid options are: up, down",
+            ))
+        }
+    };
+
+    let mut conn = state.conn.lock().unwrap();
+    match db::move_item(&mut conn, &id, direction) {
+        Ok(item) => Ok((StatusCode::OK, Json(serde_json::json!({ "item": item })))),
         Err(e) => Err(db_error_response(&id, e)),
     }
 }

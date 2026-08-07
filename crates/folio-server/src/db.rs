@@ -228,6 +228,7 @@ pub enum DbError {
     Validation(String),
     NotArchived,
     InboxOverCap(u32),
+    AlreadyAtEdge,
     Other(Box<dyn std::error::Error>),
 }
 
@@ -513,4 +514,80 @@ pub fn toggle_kind(conn: &mut Connection, id: &str) -> Result<Item, DbError> {
 
     tx.commit().map_err(|e| DbError::Other(e.into()))?;
     Ok(item)
+}
+
+pub enum MoveDirection {
+    Up,
+    Down,
+}
+
+pub fn move_item(
+    conn: &mut Connection,
+    id: &str,
+    direction: MoveDirection,
+) -> Result<Item, DbError> {
+    let tx = conn.transaction().map_err(|e| DbError::Other(e.into()))?;
+
+    let all_rows = load_items(&tx, View::All).map_err(|e| DbError::Other(e.into()))?;
+    let target = all_rows
+        .iter()
+        .find(|item| item.id == id)
+        .ok_or(DbError::NotFound)?;
+
+    let in_archive = target.status == folio_core::Status::Done;
+    let view_items: Vec<&Item> = all_rows
+        .iter()
+        .filter(|item| (item.status == folio_core::Status::Done) == in_archive)
+        .collect();
+
+    let pos_in_view = view_items
+        .iter()
+        .position(|item| item.id == id)
+        .ok_or(DbError::NotFound)?;
+
+    let swap_index = match direction {
+        MoveDirection::Up => {
+            if pos_in_view == 0 {
+                return Err(DbError::AlreadyAtEdge);
+            }
+            pos_in_view - 1
+        }
+        MoveDirection::Down => {
+            if pos_in_view + 1 >= view_items.len() {
+                return Err(DbError::AlreadyAtEdge);
+            }
+            pos_in_view + 1
+        }
+    };
+
+    let mine = view_items[pos_in_view];
+    let neighbor = view_items[swap_index];
+
+    let my_pos: i64 = tx
+        .query_row("SELECT position FROM items WHERE id = ?1", [id], |row| {
+            row.get(0)
+        })
+        .map_err(|e| DbError::Other(e.into()))?;
+    let neighbor_pos: i64 = tx
+        .query_row(
+            "SELECT position FROM items WHERE id = ?1",
+            [&neighbor.id],
+            |row| row.get(0),
+        )
+        .map_err(|e| DbError::Other(e.into()))?;
+
+    let now = Utc::now();
+    tx.execute(
+        "UPDATE items SET position = ?1, updated_at = ?2 WHERE id = ?3",
+        params![neighbor_pos, now.to_rfc3339(), id],
+    )
+    .map_err(|e| DbError::Other(e.into()))?;
+    tx.execute(
+        "UPDATE items SET position = ?1, updated_at = ?2 WHERE id = ?3",
+        params![my_pos, now.to_rfc3339(), &neighbor.id],
+    )
+    .map_err(|e| DbError::Other(e.into()))?;
+
+    tx.commit().map_err(|e| DbError::Other(e.into()))?;
+    Ok(mine.clone())
 }
