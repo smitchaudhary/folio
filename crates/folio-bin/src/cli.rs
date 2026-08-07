@@ -90,13 +90,6 @@ pub enum Commands {
     },
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum ListView {
-    Inbox,
-    Archive,
-    All,
-}
-
 #[derive(Subcommand, Debug)]
 pub enum ConfigSubcommands {
     List,

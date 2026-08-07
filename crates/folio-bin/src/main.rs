@@ -1,7 +1,7 @@
 use clap::Parser;
-use folio_bin::cli::{Cli, Commands, ConfigSubcommands, ListView};
+use folio_bin::cli::{Cli, Commands, ConfigSubcommands};
 use folio_bin::error::{CliError, print_error};
-use folio_core::{ItemType, Kind, OverflowStrategy, Status};
+use folio_core::{ItemType, Kind, OverflowStrategy, Status, View};
 use folio_storage::{
     ConfigManager, append_to_archive, get_archive_path, get_inbox_path, load_items_from_file,
     save_inbox,
@@ -24,6 +24,8 @@ fn main() {
 
 async fn run() -> Result<(), CliError> {
     let cli = Cli::parse();
+
+    let client = folio_client::Client::from_env();
 
     let config_manager = ConfigManager::new().map_err(|e| CliError::ConfigError {
         message: e.to_string(),
@@ -48,13 +50,13 @@ async fn run() -> Result<(), CliError> {
                 all,
             } => {
                 let view = if *archive {
-                    ListView::Archive
+                    View::Archive
                 } else if *all {
-                    ListView::All
+                    View::All
                 } else {
-                    ListView::Inbox
+                    View::Inbox
                 };
-                handle_list_command(view, status.as_deref(), r#type.as_deref()).await?;
+                handle_list_command(&client, view, status.as_deref(), r#type.as_deref()).await?;
             }
             Commands::SetStatus {
                 id,
@@ -97,19 +99,12 @@ fn resolve_item_index(id: usize, len: usize) -> Result<usize, CliError> {
 }
 
 async fn handle_list_command(
-    view: ListView,
+    client: &folio_client::Client,
+    view: View,
     status_filters: Option<&[String]>,
     type_filters: Option<&[String]>,
 ) -> Result<(), CliError> {
-    let items: Vec<folio_core::Item> = match view {
-        ListView::Inbox => load_items_from_file(get_inbox_path()?)?,
-        ListView::Archive => load_items_from_file(get_archive_path()?)?,
-        ListView::All => {
-            let mut items = load_items_from_file(get_inbox_path()?)?;
-            items.extend(load_items_from_file(get_archive_path()?)?);
-            items
-        }
-    };
+    let items = client.list_items(view)?;
 
     let view_is_empty = items.is_empty();
 
@@ -121,9 +116,9 @@ async fn handle_list_command(
     if filtered_items.is_empty() {
         if view_is_empty {
             match view {
-                ListView::Inbox => println!("No items in inbox."),
-                ListView::Archive => println!("No archived items."),
-                ListView::All => println!("No items found."),
+                View::Inbox => println!("No items in inbox."),
+                View::Archive => println!("No archived items."),
+                View::All => println!("No items found."),
             }
         } else {
             println!("No items match the filter.");

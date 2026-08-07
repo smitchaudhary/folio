@@ -35,6 +35,9 @@ pub enum CliError {
     #[error("Configuration error: {message}")]
     ConfigError { message: String },
 
+    #[error("{0}")]
+    Client(#[from] folio_client::ClientError),
+
     #[error("Storage error: {0}")]
     Storage(#[from] folio_storage::StorageError),
 

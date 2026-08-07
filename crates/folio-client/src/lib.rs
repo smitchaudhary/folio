@@ -307,3 +307,17 @@ pub enum ClientError {
     UnexpectedStatus(u16),
     Parse(String),
 }
+
+impl std::fmt::Display for ClientError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            ClientError::Transport(e) => write!(f, "cannot reach the folio server: {e}"),
+            ClientError::InboxFull => write!(f, "inbox is full"),
+            ClientError::Server { code, message } => write!(f, "{message} ({code})"),
+            ClientError::UnexpectedStatus(status) => write!(f, "unexpected status {status}"),
+            ClientError::Parse(e) => write!(f, "failed to parse response: {e}"),
+        }
+    }
+}
+
+impl std::error::Error for ClientError {}
