@@ -1,4 +1,4 @@
-use folio_core::{CoreError, Item, Status, StatusUpdateResult};
+use folio_core::{CoreError, Item};
 
 #[derive(PartialEq)]
 pub enum View {
@@ -66,24 +66,6 @@ impl AppState {
         self.current_items_mut()
             .iter_mut()
             .find(|item| item.id() == selected_id)
-    }
-
-    pub fn move_selected_to_done(&mut self) -> Result<Option<Item>, CoreError> {
-        let result = self.change_selected_status(Status::Done)?;
-
-        if self.current_view == View::Inbox && !result.moved_to_archive.is_empty() {
-            Ok(result.moved_to_archive.into_iter().next())
-        } else {
-            Ok(None)
-        }
-    }
-
-    pub fn move_selected_to_doing(&mut self) -> Result<StatusUpdateResult, CoreError> {
-        self.change_selected_status(Status::Doing)
-    }
-
-    pub fn move_selected_to_todo(&mut self) -> Result<StatusUpdateResult, CoreError> {
-        self.change_selected_status(Status::Todo)
     }
 
     pub fn next_item(&mut self) {
@@ -292,44 +274,5 @@ impl AppState {
 
         let idx = preferred_row.unwrap_or(0).min(visible.len() - 1);
         self.selected_item_id = visible.get(idx).cloned();
-    }
-
-    fn change_selected_status(
-        &mut self,
-        new_status: Status,
-    ) -> Result<StatusUpdateResult, CoreError> {
-        let selected_id = self.selected_item_id.as_ref().ok_or(CoreError::ItemNotFound)?;
-        let previous_row = self.selected_table_row();
-
-        let config_manager = folio_storage::ConfigManager::new()
-            .map_err(|_| CoreError::ValidationError("Failed to load config".to_string()))?;
-        let config = config_manager.get();
-
-        let result = folio_core::update_item_status(
-            selected_id,
-            new_status,
-            self.inbox_items.clone(),
-            self.archive_items.clone(),
-            config,
-        )?;
-
-        if result.item_found {
-            self.inbox_items = result.inbox_items.clone();
-            self.archive_items = result.archive_items.clone();
-
-            if (self.current_view == View::Archive && result.moved_to_inbox)
-                || (self.current_view == View::Inbox
-                    && result
-                        .moved_to_archive
-                        .iter()
-                        .any(|item| item.id() == selected_id))
-            {
-                self.reselect_visible_row(previous_row);
-            }
-
-            Ok(result)
-        } else {
-            Err(CoreError::ItemNotFound)
-        }
     }
 }

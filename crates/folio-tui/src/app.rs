@@ -80,6 +80,54 @@ impl App {
         Ok(())
     }
 
+    async fn refresh_data(&mut self) -> TuiResult<()> {
+        let previous_row = self.state.selected_table_row();
+        let inbox_items = self.client.list_items(folio_core::View::Inbox)?;
+        let archive_items = self.client.list_items(folio_core::View::Archive)?;
+
+        self.state.load_inbox_items(inbox_items);
+        self.state.load_archive_items(archive_items);
+        self.state.reselect_visible_row(previous_row);
+        self.table_state.select(self.state.selected_table_row());
+
+        Ok(())
+    }
+
+    async fn change_selected_status(&mut self, new_status: folio_core::Status) {
+        let selected_id = match self.state.selected_item_id.clone() {
+            Some(id) => id,
+            None => {
+                self.show_status_message("No item selected".to_string());
+                return;
+            }
+        };
+
+        match self.client.change_status(&selected_id, new_status.clone()) {
+            Ok(result) => {
+                let _ = self.refresh_data().await;
+                if result.moved_to_inbox && !result.overflow.is_empty() {
+                    self.show_status_message(format!(
+                        "Moved to inbox. {} item(s) archived due to overflow",
+                        result.overflow.len()
+                    ));
+                } else {
+                    let message = match new_status {
+                        folio_core::Status::Todo => "Status set to Todo",
+                        folio_core::Status::Doing => "Status set to Doing",
+                        folio_core::Status::Done => "Item archived",
+                    };
+                    self.show_status_message(message.to_string());
+                }
+            }
+            Err(folio_client::ClientError::InboxFull) => {
+                self.show_status_message("Cannot move to inbox: capacity limit reached".to_string());
+            }
+            Err(_) => {
+                self.show_status_message("Failed to update status".to_string());
+            }
+        }
+    }
+
     pub async fn save_data(&mut self) -> TuiResult<()> {
         save_inbox(self.state.get_inbox_items())?;
         save_archive(self.state.get_archive_items())?;
@@ -123,18 +171,7 @@ impl App {
         if self.show_done_confirmation {
             match key_event.code {
                 KeyCode::Char('y') | KeyCode::Char('Y') => {
-                    match self.state.move_selected_to_done() {
-                        Ok(maybe_item) => {
-                            if maybe_item.is_some() {
-                                self.show_status_message("Item archived".to_string());
-                            }
-                            let _ = self.save_data().await;
-                            self.table_state.select(self.state.selected_table_row());
-                        }
-                        Err(_) => {
-                            self.show_status_message("Failed to archive item".to_string());
-                        }
-                    }
+                    self.change_selected_status(folio_core::Status::Done).await;
                     self.show_done_confirmation = false;
                 }
                 KeyCode::Char('n') | KeyCode::Char('N') | KeyCode::Esc => {
@@ -302,50 +339,12 @@ impl App {
                 self.state.jump_to_last();
                 self.table_state.select(self.state.selected_table_row());
             }
-            KeyCode::Char('t') => match self.state.move_selected_to_todo() {
-                Ok(result) => {
-                    let _ = self.save_data().await;
-                    self.table_state.select(self.state.selected_table_row());
-                    if result.moved_to_inbox && !result.overflow_items.is_empty() {
-                        self.show_status_message(format!(
-                            "Moved to inbox. {} item(s) archived due to overflow",
-                            result.overflow_items.len()
-                        ));
-                    } else {
-                        self.show_status_message("Status set to Todo".to_string());
-                    }
-                }
-                Err(folio_core::CoreError::InboxFull) => {
-                    self.show_status_message(
-                        "Cannot move to inbox: capacity limit reached".to_string(),
-                    );
-                }
-                Err(_) => {
-                    self.show_status_message("Failed to update status".to_string());
-                }
-            },
-            KeyCode::Char('i') => match self.state.move_selected_to_doing() {
-                Ok(result) => {
-                    let _ = self.save_data().await;
-                    self.table_state.select(self.state.selected_table_row());
-                    if result.moved_to_inbox && !result.overflow_items.is_empty() {
-                        self.show_status_message(format!(
-                            "Moved to inbox. {} item(s) archived due to overflow",
-                            result.overflow_items.len()
-                        ));
-                    } else {
-                        self.show_status_message("Status set to Doing".to_string());
-                    }
-                }
-                Err(folio_core::CoreError::InboxFull) => {
-                    self.show_status_message(
-                        "Cannot move to inbox: capacity limit reached".to_string(),
-                    );
-                }
-                Err(_) => {
-                    self.show_status_message("Failed to update status".to_string());
-                }
-            },
+            KeyCode::Char('t') => {
+                self.change_selected_status(folio_core::Status::Todo).await;
+            }
+            KeyCode::Char('i') => {
+                self.change_selected_status(folio_core::Status::Doing).await;
+            }
             KeyCode::Char('d') => {
                 if self.state.selected_item().is_some() {
                     self.show_done_confirmation = true;
