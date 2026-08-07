@@ -2,9 +2,6 @@ use thiserror::Error;
 
 #[derive(Error, Debug)]
 pub enum TuiError {
-    #[error("Storage error: {0}")]
-    Storage(#[from] folio_storage::StorageError),
-
     #[error("Core error: {0}")]
     Core(#[from] folio_core::CoreError),
 

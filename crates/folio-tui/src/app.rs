@@ -6,7 +6,6 @@ use crate::terminal::{restore_terminal, setup_terminal};
 use crate::widgets::ItemsTable;
 use crossterm::event::{KeyCode, KeyEvent};
 use folio_core::{Item, OverflowStrategy};
-use folio_storage::{ConfigManager, save_archive, save_inbox};
 use ratatui::widgets::TableState;
 use std::time::{Duration, Instant};
 
@@ -125,13 +124,6 @@ impl App {
                 self.show_status_message("Failed to update status".to_string());
             }
         }
-    }
-
-    pub async fn save_data(&mut self) -> TuiResult<()> {
-        save_inbox(self.state.get_inbox_items())?;
-        save_archive(self.state.get_archive_items())?;
-        self.show_status_message("Saved".to_string());
-        Ok(())
     }
 
     fn show_status_message(&mut self, message: String) {
@@ -302,24 +294,36 @@ impl App {
                 self.state.previous_item();
                 self.table_state.select(self.state.selected_table_row());
             }
-            KeyCode::Char('J') => match self.state.move_item_down() {
-                Ok(_) => {
-                    self.table_state.select(self.state.selected_table_row());
-                    let _ = self.save_data().await;
-                    self.show_status_message("Item moved down".to_string());
-                }
-                Err(_) => {
-                    self.show_status_message("Cannot move down".to_string());
+            KeyCode::Char('J') => match self.state.selected_item_id.clone() {
+                Some(selected_id) => match self.client.move_item(&selected_id, "down") {
+                    Ok(_) => {
+                        let _ = self.refresh_data().await;
+                        self.state.selected_item_id = Some(selected_id);
+                        self.table_state.select(self.state.selected_table_row());
+                        self.show_status_message("Item moved down".to_string());
+                    }
+                    Err(_) => {
+                        self.show_status_message("Cannot move down".to_string());
+                    }
+                },
+                None => {
+                    self.show_status_message("No item selected".to_string());
                 }
             },
-            KeyCode::Char('K') => match self.state.move_item_up() {
-                Ok(_) => {
-                    self.table_state.select(self.state.selected_table_row());
-                    let _ = self.save_data().await;
-                    self.show_status_message("Item moved up".to_string());
-                }
-                Err(_) => {
-                    self.show_status_message("Cannot move up".to_string());
+            KeyCode::Char('K') => match self.state.selected_item_id.clone() {
+                Some(selected_id) => match self.client.move_item(&selected_id, "up") {
+                    Ok(_) => {
+                        let _ = self.refresh_data().await;
+                        self.state.selected_item_id = Some(selected_id);
+                        self.table_state.select(self.state.selected_table_row());
+                        self.show_status_message("Item moved up".to_string());
+                    }
+                    Err(_) => {
+                        self.show_status_message("Cannot move up".to_string());
+                    }
+                },
+                None => {
+                    self.show_status_message("No item selected".to_string());
                 }
             },
             KeyCode::PageDown => {
@@ -368,17 +372,19 @@ impl App {
             }
             KeyCode::Char('C') => {
                 self.show_config_dialog = true;
-                if let Ok(config_manager) = ConfigManager::new() {
-                    let config = config_manager.get();
-                    self.config_max_items_input = config.max_items.to_string();
-                    self.config_overflow_strategy = match config.archive_on_overflow {
-                        OverflowStrategy::Abort => 0,
-                        OverflowStrategy::Todo => 1,
-                        OverflowStrategy::Any => 2,
-                    };
-                } else {
-                    self.config_max_items_input = "30".to_string();
-                    self.config_overflow_strategy = 0;
+                match self.client.get_config() {
+                    Ok(config) => {
+                        self.config_max_items_input = config.max_items.to_string();
+                        self.config_overflow_strategy = match config.archive_on_overflow {
+                            OverflowStrategy::Abort => 0,
+                            OverflowStrategy::Todo => 1,
+                            OverflowStrategy::Any => 2,
+                        };
+                    }
+                    Err(_) => {
+                        self.config_max_items_input = "30".to_string();
+                        self.config_overflow_strategy = 0;
+                    }
                 }
             }
             KeyCode::Tab => {
@@ -478,9 +484,8 @@ impl App {
     }
 
     fn check_cap_before_add(&mut self) {
-        match ConfigManager::new() {
-            Ok(config_manager) => {
-                let config = config_manager.get();
+        match self.client.get_config() {
+            Ok(config) => {
                 if self.state.inbox_items.len() >= config.max_items as usize {
                     match config.archive_on_overflow {
                         OverflowStrategy::Abort => {
@@ -540,25 +545,22 @@ impl App {
                         _ => OverflowStrategy::Abort,
                     };
 
-                    match ConfigManager::new() {
-                        Ok(mut config_manager) => {
-                            match config_manager.update(|config| {
-                                config.max_items = max_items;
-                                config.archive_on_overflow = strategy;
-                            }) {
+                    match self.client.get_config() {
+                        Ok(mut config) => {
+                            config.max_items = max_items;
+                            config.archive_on_overflow = strategy;
+                            match self.client.set_config(&config) {
                                 Ok(_) => {
-                                    self.show_status_message(
-                                        "Config saved successfully".to_string(),
-                                    );
+                                    self.show_status_message("Config saved successfully".to_string());
                                     self.show_config_dialog = false;
                                 }
-                                Err(_) => {
-                                    self.show_status_message("Failed to save config".to_string());
+                                Err(e) => {
+                                    self.show_status_message(e.to_string());
                                 }
                             }
                         }
-                        Err(_) => {
-                            self.show_status_message("Failed to load config".to_string());
+                        Err(e) => {
+                            self.show_status_message(e.to_string());
                         }
                     }
                 } else {

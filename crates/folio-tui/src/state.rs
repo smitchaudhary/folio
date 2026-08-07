@@ -206,14 +206,6 @@ impl AppState {
         Ok(())
     }
 
-    pub fn get_inbox_items(&self) -> &[Item] {
-        &self.inbox_items
-    }
-
-    pub fn get_archive_items(&self) -> &[Item] {
-        &self.archive_items
-    }
-
     pub fn set_filter(&mut self, filter: Option<String>) {
         self.filter = filter;
 

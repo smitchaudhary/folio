@@ -16,7 +16,6 @@ arboard = "3.6.1"
 chrono = { workspace = true }
 crossterm = { workspace = true }
 folio-core = { path = "../folio-core" }
-folio-storage = { path = "../folio-storage" }
 folio-client = { path = "../folio-client" }
 opener = { workspace = true }
 ratatui = { workspace = true }
