@@ -23,9 +23,6 @@ pub enum CliError {
     #[error("Unknown config key '{key}'. Valid keys are: max_items, archive_on_overflow")]
     UnknownConfigKey { key: String },
 
-    #[error("Inbox limit ({limit}) reached. {suggestions}")]
-    InboxFull { limit: u32, suggestions: String },
-
     #[error("Validation error: {message}")]
     ValidationError { message: String },
 

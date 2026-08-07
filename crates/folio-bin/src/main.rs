@@ -3,7 +3,7 @@ use folio_bin::cli::{Cli, Commands, ConfigSubcommands};
 use folio_bin::error::{CliError, print_error};
 use folio_core::{ItemType, Kind, OverflowStrategy, Status, View};
 use folio_storage::{
-    ConfigManager, append_to_archive, get_archive_path, get_inbox_path, load_items_from_file,
+    ConfigManager, get_archive_path, get_inbox_path, load_items_from_file,
     save_inbox,
 };
 
@@ -26,10 +26,6 @@ async fn run() -> Result<(), CliError> {
     let cli = Cli::parse();
 
     let client = folio_client::Client::from_env();
-
-    let config_manager = ConfigManager::new().map_err(|e| CliError::ConfigError {
-        message: e.to_string(),
-    })?;
 
     match &cli.command {
         Some(command) => match command {
@@ -63,16 +59,16 @@ async fn run() -> Result<(), CliError> {
                 status,
                 archive,
             } => {
-                handle_set_status_command(&config_manager, *id, status, *archive).await?;
+                handle_set_status_command(&client, *id, status, *archive).await?;
             }
             Commands::Edit { id, archive } => {
                 handle_edit_command(*id, *archive).await?;
             }
             Commands::Archive { id } => {
-                handle_archive_command(*id).await?;
+                handle_archive_command(&client, *id).await?;
             }
             Commands::Delete { id, archive } => {
-                handle_delete_command(*id, *archive).await?;
+                handle_delete_command(&client, *id, *archive).await?;
             }
             Commands::MarkRef { id, archive } => {
                 handle_mark_ref_command(*id, *archive).await?;
@@ -168,51 +164,42 @@ fn matches_filters(
 }
 
 async fn handle_set_status_command(
-    config_manager: &ConfigManager,
+    client: &folio_client::Client,
     id: usize,
     status_str: &str,
     archive: bool,
 ) -> Result<(), CliError> {
-    let inbox_path = get_inbox_path()?;
-    let archive_path = get_archive_path()?;
-
-    let inbox_items = load_items_from_file(&inbox_path)?;
-    let archive_items = load_items_from_file(&archive_path)?;
-
     let new_status = Status::from_str(status_str).map_err(|_| CliError::InvalidStatus {
         status: status_str.to_string(),
     })?;
 
-    let view_items = if archive {
-        &archive_items
+    let view = if archive {
+        View::Archive
     } else {
-        &inbox_items
+        View::Inbox
     };
-    let index = resolve_item_index(id, view_items.len())?;
-    let stable_id = view_items[index].id().to_string();
+    let items = client.list_items(view).map_err(|e| map_client_error(id, e))?;
+    let index = resolve_item_index(id, items.len())?;
+    let stable_id = items[index].id.clone();
 
-    let config = config_manager.get();
-    let result =
-        folio_core::update_item_status(&stable_id, new_status, inbox_items, archive_items, config)?;
+    let result = client
+        .change_status(&stable_id, new_status)
+        .map_err(|e| map_client_error(id, e))?;
 
-    if !result.item_found {
-        return Err(CliError::ItemNotFound { id });
-    }
-
-    if !result.moved_to_archive.is_empty() {
+    if result.moved_to_archive {
         println!(
             "Item #{} status updated to '{}' and moved to archive",
             id, status_str
         );
     } else if result.moved_to_inbox {
-        if !result.overflow_items.is_empty() {
+        if !result.overflow.is_empty() {
             println!(
                 "Item #{} status updated to '{}' and moved to inbox. {} item(s) were archived due to overflow:",
                 id,
                 status_str,
-                result.overflow_items.len()
+                result.overflow.len()
             );
-            for item in &result.overflow_items {
+            for item in &result.overflow {
                 println!("  - {} ({})", item.name, item.status.as_string());
             }
         } else {
@@ -224,9 +211,6 @@ async fn handle_set_status_command(
     } else {
         println!("Item #{} status updated to '{}'", id, status_str);
     }
-
-    save_inbox(&result.inbox_items)?;
-    folio_storage::save_archive(&result.archive_items)?;
 
     Ok(())
 }
@@ -298,49 +282,45 @@ async fn handle_edit_command(id: usize, archive: bool) -> Result<(), CliError> {
     Ok(())
 }
 
-async fn handle_archive_command(id: usize) -> Result<(), CliError> {
-    let inbox_path = get_inbox_path()?;
-    let archive_path = get_archive_path()?;
-    let mut inbox_items = load_items_from_file(&inbox_path)?;
-    let archive_items = load_items_from_file(&archive_path)?;
-
-    let index = match resolve_item_index(id, inbox_items.len()) {
-        Ok(index) => index,
+async fn handle_archive_command(
+    client: &folio_client::Client,
+    id: usize,
+) -> Result<(), CliError> {
+    let inbox_items = client.list_items(View::Inbox).map_err(|e| map_client_error(id, e))?;
+    match resolve_item_index(id, inbox_items.len()) {
+        Ok(index) => {
+            let stable_id = inbox_items[index].id.clone();
+            client
+                .change_status(&stable_id, Status::Done)
+                .map_err(|e| map_client_error(id, e))?;
+            println!("Item #{} marked as done and archived successfully", id);
+            Ok(())
+        }
         Err(_) => {
+            let archive_items = client.list_items(View::Archive).map_err(|e| map_client_error(id, e))?;
             if resolve_item_index(id, archive_items.len()).is_ok() {
                 println!("Item #{} is already in archive", id);
-                return Ok(());
+                Ok(())
+            } else {
+                Err(CliError::ItemNotFound { id })
             }
-            return Err(CliError::ItemNotFound { id });
         }
-    };
-
-    let mut item = inbox_items.remove(index);
-
-    item.status = Status::Done;
-    folio_core::update_timestamps(&mut item);
-
-    append_to_archive(&item)?;
-
-    save_inbox(&inbox_items)?;
-
-    println!("Item #{} marked as done and archived successfully", id);
-    Ok(())
+    }
 }
 
-async fn handle_delete_command(id: usize, archive: bool) -> Result<(), CliError> {
-    let inbox_path = get_inbox_path()?;
-    let archive_path = get_archive_path()?;
-    let mut inbox_items = load_items_from_file(&inbox_path)?;
-    let mut archive_items = load_items_from_file(&archive_path)?;
-
-    let view_items: &mut Vec<folio_core::Item> = if archive {
-        &mut archive_items
+async fn handle_delete_command(
+    client: &folio_client::Client,
+    id: usize,
+    archive: bool,
+) -> Result<(), CliError> {
+    let view = if archive {
+        View::Archive
     } else {
-        &mut inbox_items
+        View::Inbox
     };
-    let index = resolve_item_index(id, view_items.len())?;
-    let item = view_items[index].clone();
+    let items = client.list_items(view).map_err(|e| map_client_error(id, e))?;
+    let index = resolve_item_index(id, items.len())?;
+    let item = &items[index];
 
     println!("Item to delete:");
     println!("  Name: {}", item.name);
@@ -362,13 +342,9 @@ async fn handle_delete_command(id: usize, archive: bool) -> Result<(), CliError>
         return Ok(());
     }
 
-    view_items.remove(index);
-
-    if archive {
-        folio_storage::save_archive(&archive_items)?;
-    } else {
-        save_inbox(&inbox_items)?;
-    }
+    client
+        .delete_item(&item.id)
+        .map_err(|e| map_client_error(id, e))?;
 
     println!("Item #{} deleted successfully", id);
     Ok(())
@@ -587,4 +563,13 @@ async fn handle_config_command(subcommand: &ConfigSubcommands) -> Result<(), Cli
     }
 
     Ok(())
+}
+
+fn map_client_error(id: usize, e: folio_client::ClientError) -> CliError {
+    match e {
+        folio_client::ClientError::Server { code, .. } if code == "not_found" => {
+            CliError::ItemNotFound { id }
+        }
+        e => CliError::Client(e),
+    }
 }
