@@ -1,0 +1,8 @@
+[package]
+name = "folio-client"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+ureq = { workspace = true }
+folio-core = { path = "../folio-core" }

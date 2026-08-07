@@ -1,6 +1,7 @@
 [workspace]
 members = [
     "crates/folio-bin",
+    "crates/folio-client",
     "crates/folio-core",
     "crates/folio-storage",
     "crates/folio-server",
@@ -24,3 +25,4 @@ dirs = "6.0"
 axum = "0.8"
 rusqlite = { version = "0.37", features = ["bundled"] }
 uuid = { version = "1.0", features = ["v4"] }
+ureq = "3"
