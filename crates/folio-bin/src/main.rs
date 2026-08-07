@@ -41,7 +41,7 @@ async fn run() -> Result<(), CliError> {
                 note,
                 kind,
             } => {
-                handle_add_command(&config_manager, name, r#type, author, link, note, kind).await?;
+                handle_add_command(&client, name, r#type, author, link, note, kind).await?;
             }
             Commands::List {
                 status,
@@ -420,7 +420,7 @@ async fn prompt_for_input(field_name: &str) -> Result<String, CliError> {
 }
 
 async fn handle_add_command(
-    config_manager: &ConfigManager,
+    client: &folio_client::Client,
     name: &Option<String>,
     item_type: &Option<String>,
     author: &Option<String>,
@@ -433,40 +433,20 @@ async fn handle_add_command(
         return Ok(());
     }
 
-    let config = config_manager.get();
-
-    let inbox_path = get_inbox_path()?;
-    let inbox_items = load_items_from_file(&inbox_path)?;
-
-    let new_item = folio_core::create_item(
+    let mut request = folio_client::AddItemRequest::new(
         name.clone().unwrap_or_else(|| "Untitled".to_string()),
-        item_type.clone(),
-        author.clone(),
-        link.clone(),
-        note.clone(),
-        kind.clone(),
-    )?;
+    );
+    request.item_type = item_type.clone();
+    request.author = author.clone();
+    request.link = link.clone();
+    request.note = note.clone();
+    request.kind = kind.clone();
 
-    if matches!(new_item.kind, Kind::Reference) {
-        let mut ref_item = new_item;
-        ref_item.status = Status::Done;
-        folio_core::update_timestamps(&mut ref_item);
-        append_to_archive(&ref_item)?;
-        println!("Added reference item as done and archived");
-        return Ok(());
-    }
-
-    match folio_core::add_item_to_inbox(inbox_items, new_item, config) {
-        Ok((new_inbox, to_archive)) => {
-            let has_archived_items = !to_archive.is_empty();
-
-            save_inbox(&new_inbox)?;
-
-            for item in &to_archive {
-                append_to_archive(item)?;
-            }
-
-            if has_archived_items {
+    match client.add_item(request) {
+        Ok((item, to_archive)) => {
+            if matches!(item.kind, Kind::Reference) {
+                println!("Added reference item as done and archived");
+            } else if !to_archive.is_empty() {
                 println!(
                     "Item added successfully. The following item(s) were automatically archived due to overflow:"
                 );
@@ -478,55 +458,44 @@ async fn handle_add_command(
             }
             Ok(())
         }
-        Err(_) => {
-            match &config.archive_on_overflow {
-                OverflowStrategy::Abort => {
-                    println!("Inbox limit ({}) reached.", config.max_items);
-                    println!();
-                    println!("Choose an action:");
-                    println!("  [D]elete an existing item (use 'folio delete <id>')");
-                    println!(
-                        "  [A]rchive an item (change status to 'done' or use 'folio archive <id>')"
-                    );
-                    println!("  [I]ncrease inbox size: `folio config set max_items N`");
-                    println!(
-                        "  [C]hange overflow strategy: `folio config set archive_on_overflow [todo|any]`"
-                    );
-                    println!();
-                    println!("Would you like to see the current inbox items? (y/N): ");
+        Err(folio_client::ClientError::InboxFull) => {
+            println!("Inbox limit reached.");
+            println!();
+            println!("Choose an action:");
+            println!("  [D]elete an existing item (use 'folio delete <id>')");
+            println!(
+                "  [A]rchive an item (change status to 'done' or use 'folio archive <id>')"
+            );
+            println!("  [I]ncrease inbox size: `folio config set max_items N`");
+            println!(
+                "  [C]hange overflow strategy: `folio config set archive_on_overflow [todo|any]`"
+            );
+            println!();
+            println!("Would you like to see the current inbox items? (y/N): ");
 
-                    use std::io::{Write, stdin, stdout};
-                    stdout().flush()?;
-                    let mut input = String::new();
-                    tokio::task::block_in_place(|| stdin().read_line(&mut input))?;
-                    let response = input.trim().to_lowercase();
+            use std::io::{Write, stdin, stdout};
+            stdout().flush()?;
+            let mut input = String::new();
+            tokio::task::block_in_place(|| stdin().read_line(&mut input))?;
+            let response = input.trim().to_lowercase();
 
-                    if response == "y" || response == "yes" {
-                        let inbox_items = load_items_from_file(&inbox_path)?;
-                        if !inbox_items.is_empty() {
-                            println!();
-                            println!("{}", folio_core::Item::format_list_header());
-                            println!("{}", folio_core::Item::format_list_separator());
+            if response == "y" || response == "yes" {
+                if let Ok(inbox_items) = client.list_items(folio_core::View::Inbox) {
+                    if !inbox_items.is_empty() {
+                        println!();
+                        println!("{}", folio_core::Item::format_list_header());
+                        println!("{}", folio_core::Item::format_list_separator());
 
-                            for (index, item) in inbox_items.iter().enumerate() {
-                                println!("{}", item.format_for_list(index + 1));
-                            }
+                        for (index, item) in inbox_items.iter().enumerate() {
+                            println!("{}", item.format_for_list(index + 1));
                         }
                     }
-
-                    std::process::exit(1);
-                }
-                _ => {
-                    // This shouldn't happen since we only return Err for Abort strategy
-                    // But just in case, handle it gracefully
-                    Err(CliError::InboxFull {
-                        limit: config.max_items,
-                        suggestions: "This should not happen with current overflow strategies."
-                            .to_string(),
-                    })
                 }
             }
+
+            std::process::exit(1);
         }
+        Err(e) => Err(CliError::Client(e)),
     }
 }
 
