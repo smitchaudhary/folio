@@ -2,7 +2,6 @@ use clap::Parser;
 use folio_bin::cli::{Cli, Commands, ConfigSubcommands};
 use folio_bin::error::{CliError, print_error};
 use folio_core::{ItemType, Kind, OverflowStrategy, Status, View};
-use folio_storage::ConfigManager;
 
 use std::str::FromStr;
 
@@ -71,7 +70,7 @@ async fn run() -> Result<(), CliError> {
                 handle_mark_ref_command(&client, *id, *archive).await?;
             }
             Commands::Config { subcommand } => {
-                handle_config_command(subcommand).await?;
+                handle_config_command(&client, subcommand).await?;
             }
         },
         None => {
@@ -464,89 +463,65 @@ async fn handle_add_command(
     }
 }
 
-async fn handle_config_command(subcommand: &ConfigSubcommands) -> Result<(), CliError> {
+async fn handle_config_command(
+    client: &folio_client::Client,
+    subcommand: &ConfigSubcommands,
+) -> Result<(), CliError> {
     match subcommand {
         ConfigSubcommands::List => {
-            let config_manager = ConfigManager::new().map_err(|e| CliError::ConfigError {
-                message: e.to_string(),
-            })?;
-            let json = serde_json::to_string_pretty(config_manager.get())?;
+            let config = client.get_config()?;
+            let json = serde_json::to_string_pretty(&config)?;
             println!("{}", json);
         }
         ConfigSubcommands::Get { key } => {
-            let config_manager = ConfigManager::new().map_err(|e| CliError::ConfigError {
-                message: e.to_string(),
-            })?;
-            let config_value = serde_json::to_value(config_manager.get())?;
-
+            let config = client.get_config()?;
             match key.as_str() {
-                "max_items" => println!("{}", config_value["max_items"]),
-                "archive_on_overflow" => println!("{}", config_value["archive_on_overflow"]),
-                "version" | "_v" => println!("{}", config_value["_v"]),
+                "max_items" => println!("{}", config.max_items),
+                "archive_on_overflow" => println!(
+                    "{}",
+                    match config.archive_on_overflow {
+                        OverflowStrategy::Abort => "abort",
+                        OverflowStrategy::Todo => "todo",
+                        OverflowStrategy::Any => "any",
+                    }
+                ),
                 _ => {
                     return Err(CliError::UnknownConfigKey { key: key.clone() });
                 }
             }
         }
         ConfigSubcommands::Set { key, value } => {
-            let mut config_manager = ConfigManager::new().map_err(|e| CliError::ConfigError {
-                message: e.to_string(),
-            })?;
-
-            config_manager
-                .update(|config| match key.as_str() {
-                    "max_items" => {
-                        if let Ok(val) = value.parse::<u32>() {
-                            config.max_items = val;
-                        }
-                    }
-                    "archive_on_overflow" => match value.as_str() {
-                        "abort" => config.archive_on_overflow = OverflowStrategy::Abort,
-                        "todo" => config.archive_on_overflow = OverflowStrategy::Todo,
-                        "any" => config.archive_on_overflow = OverflowStrategy::Any,
-                        _ => {}
-                    },
-                    _ => {}
-                })
-                .map_err(|e| CliError::ConfigError {
-                    message: e.to_string(),
-                })?;
-
+            let mut config = client.get_config()?;
             match key.as_str() {
                 "max_items" => {
-                    if value.parse::<u32>().is_err() {
-                        return Err(CliError::InvalidMaxItems {
+                    let val = value.parse::<u32>().map_err(|_| {
+                        CliError::InvalidMaxItems {
                             value: value.clone(),
-                        });
-                    }
+                        }
+                    })?;
+                    config.max_items = val;
                 }
                 "archive_on_overflow" => {
-                    if !matches!(value.as_str(), "abort" | "todo" | "any") {
-                        return Err(CliError::InvalidOverflowStrategy {
-                            value: value.to_string(),
-                        });
-                    }
+                    config.archive_on_overflow = match value.as_str() {
+                        "abort" => OverflowStrategy::Abort,
+                        "todo" => OverflowStrategy::Todo,
+                        "any" => OverflowStrategy::Any,
+                        _ => {
+                            return Err(CliError::InvalidOverflowStrategy {
+                                value: value.to_string(),
+                            })
+                        }
+                    };
                 }
                 _ => {
                     return Err(CliError::UnknownConfigKey { key: key.clone() });
                 }
             }
-
+            client.set_config(&config)?;
             println!("Config updated successfully");
         }
         ConfigSubcommands::Reset => {
-            let mut config_manager = ConfigManager::new().map_err(|e| CliError::ConfigError {
-                message: e.to_string(),
-            })?;
-
-            config_manager
-                .update(|config| {
-                    *config = folio_core::Config::default();
-                })
-                .map_err(|e| CliError::ConfigError {
-                    message: e.to_string(),
-                })?;
-
+            client.set_config(&folio_core::Config::default())?;
             println!("Config reset to default values");
         }
     }

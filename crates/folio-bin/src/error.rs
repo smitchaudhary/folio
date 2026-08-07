@@ -35,9 +35,6 @@ pub enum CliError {
     #[error("{0}")]
     Client(#[from] folio_client::ClientError),
 
-    #[error("Storage error: {0}")]
-    Storage(#[from] folio_storage::StorageError),
-
     #[error("TUI error: {0}")]
     Tui(#[from] folio_tui::TuiError),
 }

@@ -10,7 +10,6 @@ path = "src/main.rs"
 [dependencies]
 clap = { workspace = true }
 folio-core = { path = "../folio-core" }
-folio-storage = { path = "../folio-storage" }
 folio-tui = { path = "../folio-tui" }
 folio-client = { path = "../folio-client" }
 chrono = { workspace = true }

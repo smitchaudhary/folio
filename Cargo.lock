@@ -624,7 +624,6 @@ dependencies = [
  "clap",
  "folio-client",
  "folio-core",
- "folio-storage",
  "folio-tui",
  "serde_json",
  "strum 0.27.2",
