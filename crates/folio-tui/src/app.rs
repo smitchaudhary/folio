@@ -6,15 +6,14 @@ use crate::terminal::{restore_terminal, setup_terminal};
 use crate::widgets::ItemsTable;
 use crossterm::event::{KeyCode, KeyEvent};
 use folio_core::{Item, OverflowStrategy};
-use folio_storage::{
-    ConfigManager, get_archive_path, get_inbox_path, load_items_from_file, save_archive, save_inbox,
-};
+use folio_storage::{ConfigManager, save_archive, save_inbox};
 use ratatui::widgets::TableState;
 use std::str::FromStr;
 use std::time::{Duration, Instant};
 
 pub struct App {
     pub should_quit: bool,
+    pub client: folio_client::Client,
     pub state: AppState,
     pub table_state: TableState,
     pub add_form: ItemForm,
@@ -44,6 +43,7 @@ impl App {
     pub fn new() -> Self {
         Self {
             should_quit: false,
+            client: folio_client::Client::from_env(),
             state: AppState::new(),
             table_state: TableState::default(),
             add_form: ItemForm::new(FormType::Add),
@@ -71,8 +71,8 @@ impl App {
     }
 
     pub async fn load_data(&mut self) -> TuiResult<()> {
-        let inbox_items = load_items_from_file(get_inbox_path()?)?;
-        let archive_items = load_items_from_file(get_archive_path()?)?;
+        let inbox_items = self.client.list_items(folio_core::View::Inbox)?;
+        let archive_items = self.client.list_items(folio_core::View::Archive)?;
 
         self.state.load_inbox_items(inbox_items);
         self.state.load_archive_items(archive_items);

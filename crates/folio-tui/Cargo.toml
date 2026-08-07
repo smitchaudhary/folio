@@ -17,6 +17,7 @@ chrono = { workspace = true }
 crossterm = { workspace = true }
 folio-core = { path = "../folio-core" }
 folio-storage = { path = "../folio-storage" }
+folio-client = { path = "../folio-client" }
 opener = { workspace = true }
 ratatui = { workspace = true }
 thiserror = { workspace = true }

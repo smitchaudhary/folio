@@ -8,6 +8,9 @@ pub enum TuiError {
     #[error("Core error: {0}")]
     Core(#[from] folio_core::CoreError),
 
+    #[error("{0}")]
+    Client(#[from] folio_client::ClientError),
+
     #[error("Terminal I/O error: {0}")]
     Io(#[from] std::io::Error),
 

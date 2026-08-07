@@ -687,6 +687,7 @@ dependencies = [
  "arboard",
  "chrono",
  "crossterm 0.29.0",
+ "folio-client",
  "folio-core",
  "folio-storage",
  "opener",
