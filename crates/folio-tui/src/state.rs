@@ -206,10 +206,6 @@ impl AppState {
         Ok(())
     }
 
-    pub fn add_item_to_archive(&mut self, item: Item) {
-        self.archive_items.push(item);
-    }
-
     pub fn get_inbox_items(&self) -> &[Item] {
         &self.inbox_items
     }

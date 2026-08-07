@@ -8,7 +8,6 @@ use crossterm::event::{KeyCode, KeyEvent};
 use folio_core::{Item, OverflowStrategy};
 use folio_storage::{ConfigManager, save_archive, save_inbox};
 use ratatui::widgets::TableState;
-use std::str::FromStr;
 use std::time::{Duration, Instant};
 
 pub struct App {
@@ -515,12 +514,18 @@ impl App {
             return;
         }
 
-        if let Some(item) = self.state.selected_item_mut() {
-            match item.kind {
-                folio_core::Kind::Normal => item.kind = folio_core::Kind::Reference,
-                folio_core::Kind::Reference => item.kind = folio_core::Kind::Normal,
+        let selected_id = match self.state.selected_item_id.clone() {
+            Some(id) => id,
+            None => return,
+        };
+
+        match self.client.toggle_kind(&selected_id) {
+            Ok(_) => {
+                let _ = self.refresh_data().await;
             }
-            let _ = self.save_data().await;
+            Err(_) => {
+                self.show_status_message("Failed to toggle reference".to_string());
+            }
         }
     }
 
@@ -580,40 +585,14 @@ impl App {
             Some(id) => id,
             None => return,
         };
-        let preferred_row = self.state.selected_table_row();
 
-        match self.state.current_view {
-            View::Inbox => {
-                if let Some(pos) = self
-                    .state
-                    .inbox_items
-                    .iter()
-                    .position(|item| item.id() == selected_id)
-                {
-                    self.state.inbox_items.remove(pos);
-
-                    self.state.reselect_visible_row(preferred_row);
-                    self.table_state.select(self.state.selected_table_row());
-
-                    let _ = self.save_data().await;
-                    self.show_status_message("Item deleted".to_string());
-                }
+        match self.client.delete_item(&selected_id) {
+            Ok(()) => {
+                let _ = self.refresh_data().await;
+                self.show_status_message("Item deleted".to_string());
             }
-            View::Archive => {
-                if let Some(pos) = self
-                    .state
-                    .archive_items
-                    .iter()
-                    .position(|item| item.id() == selected_id)
-                {
-                    self.state.archive_items.remove(pos);
-
-                    self.state.reselect_visible_row(preferred_row);
-                    self.table_state.select(self.state.selected_table_row());
-
-                    let _ = self.save_data().await;
-                    self.show_status_message("Item deleted".to_string());
-                }
+            Err(_) => {
+                self.show_status_message("Failed to delete item".to_string());
             }
         }
     }
@@ -649,68 +628,42 @@ impl App {
             .cloned()
             .unwrap_or_default();
 
-        let new_item = match folio_core::create_item(
-            name,
-            Some(item_type),
-            Some(author),
-            Some(link),
-            Some(note),
-            None,
-        ) {
-            Ok(item) => item,
-            Err(_) => return None,
-        };
+        let mut request = folio_client::AddItemRequest::new(name);
+        request.item_type = Some(item_type);
+        request.author = Some(author);
+        request.link = Some(link);
+        request.note = Some(note);
 
-        let item_id = new_item.id.clone();
+        match self.client.add_item(request) {
+            Ok((item, to_archive)) => {
+                let _ = self.refresh_data().await;
 
-        match ConfigManager::new() {
-            Ok(config_manager) => {
-                let config = config_manager.get();
-                match folio_core::add_item_to_inbox(
-                    self.state.inbox_items.clone(),
-                    new_item,
-                    config,
-                ) {
-                    Ok((new_inbox, to_archive)) => {
-                        self.state.inbox_items = new_inbox;
-
-                        for item in &to_archive {
-                            self.state.add_item_to_archive(item.clone());
-                        }
-
-                        let _ = self.save_data().await;
-
-                        if !to_archive.is_empty() {
-                            self.show_status_message(format!(
-                                "Item added. {} item(s) archived due to overflow",
-                                to_archive.len()
-                            ));
-                        } else {
-                            self.show_status_message("Item added".to_string());
-                        }
-
-                        Some(item_id)
-                    }
-                    Err(_) => {
-                        self.cap_warning_message = format!(
-                            "Inbox limit ({}) reached.\n\n\
-                             Choose an action:\n\
-                             • Delete an existing item (use 'x' key to delete)\n\
-                             • Archive an item (change status to 'done' or use 'd' key)\n\
-                             • Adjust inbox size: `folio config set max_items N`\n\
-                             • Change overflow strategy: `folio config set archive_on_overflow [todo|any]`",
-                            config.max_items
-                        );
-                        self.show_cap_warning = true;
-                        None
-                    }
+                if !to_archive.is_empty() {
+                    self.show_status_message(format!(
+                        "Item added. {} item(s) archived due to overflow",
+                        to_archive.len()
+                    ));
+                } else {
+                    self.show_status_message("Item added".to_string());
                 }
+
+                Some(item.id)
+            }
+            Err(folio_client::ClientError::InboxFull) => {
+                self.cap_warning_message = format!(
+                    "Inbox limit reached.\n\n\
+                     Choose an action:\n\
+                     • Delete an existing item (use 'x' key to delete)\n\
+                     • Archive an item (change status to 'done' or use 'd' key)\n\
+                     • Adjust inbox size: `folio config set max_items N`\n\
+                     • Change overflow strategy: `folio config set archive_on_overflow [todo|any]`"
+                );
+                self.show_cap_warning = true;
+                None
             }
             Err(_) => {
-                self.state.inbox_items.push(new_item);
-                let _ = self.save_data().await;
-                self.show_status_message("Item added".to_string());
-                Some(item_id)
+                self.show_status_message("Failed to add item".to_string());
+                None
             }
         }
     }
@@ -746,23 +699,29 @@ impl App {
             .cloned()
             .unwrap_or_default();
 
-        if let Some(item) = self.state.selected_item_mut() {
-            item.name = name;
-            item.item_type =
-                folio_core::ItemType::from_str(&item_type).unwrap_or(folio_core::ItemType::Other);
-            item.author = author;
-            item.link = link;
-            item.note = note;
+        let selected_id = match self.state.selected_item_id.clone() {
+            Some(id) => id,
+            None => return false,
+        };
 
-            if item.validate().is_err() {
-                return false;
+        let request = folio_client::EditItemRequest {
+            name: Some(name),
+            item_type: Some(item_type),
+            author: Some(author),
+            link: Some(link),
+            note: Some(note),
+        };
+
+        match self.client.edit_item(&selected_id, request) {
+            Ok(_) => {
+                let _ = self.refresh_data().await;
+                self.show_status_message("Item updated".to_string());
+                true
             }
-
-            let _ = self.save_data().await;
-            self.show_status_message("Item updated".to_string());
-            true
-        } else {
-            false
+            Err(_) => {
+                self.show_status_message("Failed to update item".to_string());
+                false
+            }
         }
     }
 
