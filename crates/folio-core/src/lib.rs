@@ -334,3 +334,13 @@ pub enum View {
     Archive,
     All,
 }
+
+impl View {
+    pub fn as_string(&self) -> &'static str {
+        match self {
+            View::Inbox => "inbox",
+            View::Archive => "archive",
+            View::All => "all",
+        }
+    }
+}
