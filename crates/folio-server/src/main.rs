@@ -93,6 +93,7 @@ async fn serve(bind: SocketAddr, db_arg: &Path) {
         .route("/api/items/{id}/status", post(update_item_status))
         .route("/api/items/{id}", patch(edit_item).delete(delete_item))
         .route("/api/items/{id}/kind", post(toggle_kind))
+        .route("/api/config", get(get_config).put(update_config))
         .with_state(state);
 
     let listener = match tokio::net::TcpListener::bind(bind).await {
@@ -173,6 +174,13 @@ fn db_error_response(id: &str, e: db::DbError) -> (StatusCode, Json<serde_json::
             "not_archived",
             "Only archived items can be marked as references",
         ),
+        db::DbError::InboxOverCap(count) => error_response(
+            StatusCode::BAD_REQUEST,
+            "inbox_over_cap",
+            &format!(
+                "Inbox has {count} items. max_items cannot be set below the current inbox size."
+            ),
+        ),
         db::DbError::Other(e) => error_response(
             StatusCode::INTERNAL_SERVER_ERROR,
             "internal_error",
@@ -234,6 +242,53 @@ async fn toggle_kind(
     match db::toggle_kind(&mut conn, &id) {
         Ok(item) => Ok((StatusCode::OK, Json(serde_json::json!({ "item": item })))),
         Err(e) => Err(db_error_response(&id, e)),
+    }
+}
+
+async fn get_config(
+    State(state): State<AppState>,
+) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
+    let conn = state.conn.lock().unwrap();
+    match db::load_config(&conn) {
+        Ok(config) => Ok(Json(serde_json::json!({
+            "max_items": config.max_items,
+            "archive_on_overflow": db::strategy_to_str(&config.archive_on_overflow),
+        }))),
+        Err(e) => Err(db_error_response("", db::DbError::Other(e))),
+    }
+}
+
+#[derive(Deserialize)]
+struct UpdateConfigRequest {
+    max_items: u32,
+    archive_on_overflow: String,
+}
+
+async fn update_config(
+    State(state): State<AppState>,
+    Json(body): Json<UpdateConfigRequest>,
+) -> Result<(StatusCode, Json<serde_json::Value>), (StatusCode, Json<serde_json::Value>)> {
+    let strategy = match db::parse_strategy(&body.archive_on_overflow) {
+        Some(s) => s,
+        None => {
+            return Err(error_response(
+                StatusCode::BAD_REQUEST,
+                "invalid_overflow_strategy",
+                "Valid options are: abort, todo, any",
+            ))
+        }
+    };
+
+    let mut conn = state.conn.lock().unwrap();
+    match db::save_config(&mut conn, body.max_items, strategy) {
+        Ok(config) => Ok((
+            StatusCode::OK,
+            Json(serde_json::json!({
+                "max_items": config.max_items,
+                "archive_on_overflow": db::strategy_to_str(&config.archive_on_overflow),
+            })),
+        )),
+        Err(e) => Err(db_error_response("", e)),
     }
 }
 

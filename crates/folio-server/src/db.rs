@@ -141,6 +141,23 @@ fn parse_ts_opt(s: Option<String>) -> Result<Option<DateTime<Utc>>, Box<dyn std:
     s.map(|v| parse_ts(&v)).transpose()
 }
 
+pub fn parse_strategy(s: &str) -> Option<OverflowStrategy> {
+    match s {
+        "abort" => Some(OverflowStrategy::Abort),
+        "todo" => Some(OverflowStrategy::Todo),
+        "any" => Some(OverflowStrategy::Any),
+        _ => None,
+    }
+}
+
+pub fn strategy_to_str(s: &OverflowStrategy) -> &'static str {
+    match s {
+        OverflowStrategy::Abort => "abort",
+        OverflowStrategy::Todo => "todo",
+        OverflowStrategy::Any => "any",
+    }
+}
+
 pub fn load_config(conn: &Connection) -> Result<folio_core::Config, Box<dyn std::error::Error>> {
     let (max_items, strategy_str): (u32, String) = conn.query_row(
         "SELECT max_items, archive_on_overflow FROM config WHERE id = 1",
@@ -148,12 +165,47 @@ pub fn load_config(conn: &Connection) -> Result<folio_core::Config, Box<dyn std:
         |row| Ok((row.get(0)?, row.get(1)?)),
     )?;
 
-    let archive_on_overflow = match strategy_str.as_str() {
-        "abort" => OverflowStrategy::Abort,
-        "todo" => OverflowStrategy::Todo,
-        "any" => OverflowStrategy::Any,
-        other => return Err(format!("unknown overflow strategy: {other}").into()),
-    };
+    let archive_on_overflow = parse_strategy(&strategy_str)
+        .ok_or_else(|| format!("unknown overflow strategy: {strategy_str}"))?;
+
+    Ok(folio_core::Config {
+        max_items,
+        archive_on_overflow,
+        version: 1,
+    })
+}
+
+pub fn save_config(
+    conn: &mut Connection,
+    max_items: u32,
+    archive_on_overflow: OverflowStrategy,
+) -> Result<folio_core::Config, DbError> {
+    if !(1..=1000).contains(&max_items) {
+        return Err(DbError::Validation(
+            "max_items must be between 1 and 1000".to_string(),
+        ));
+    }
+
+    let tx = conn.transaction().map_err(|e| DbError::Other(e.into()))?;
+    let inbox_count: i64 = tx
+        .query_row(
+            "SELECT COUNT(*) FROM items WHERE status != 'done'",
+            [],
+            |row| row.get(0),
+        )
+        .map_err(|e| DbError::Other(e.into()))?;
+
+    if (max_items as i64) < inbox_count {
+        return Err(DbError::InboxOverCap(inbox_count as u32));
+    }
+
+    tx.execute(
+        "UPDATE config SET max_items = ?1, archive_on_overflow = ?2 WHERE id = 1",
+        params![max_items, strategy_to_str(&archive_on_overflow)],
+    )
+    .map_err(|e| DbError::Other(e.into()))?;
+
+    tx.commit().map_err(|e| DbError::Other(e.into()))?;
 
     Ok(folio_core::Config {
         max_items,
@@ -176,6 +228,7 @@ pub enum DbError {
     InboxFull,
     Validation(String),
     NotArchived,
+    InboxOverCap(u32),
     Other(Box<dyn std::error::Error>),
 }
 
