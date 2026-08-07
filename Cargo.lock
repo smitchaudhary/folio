@@ -635,6 +635,7 @@ dependencies = [
 name = "folio-client"
 version = "0.1.0"
 dependencies = [
+ "dirs",
  "folio-core",
  "serde",
  "serde_json",

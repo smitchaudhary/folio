@@ -67,6 +67,14 @@ impl Client {
         }
     }
 
+    pub fn from_env() -> Self {
+        let url = std::env::var("FOLIO_SERVER")
+            .ok()
+            .or_else(load_client_json)
+            .unwrap_or_else(|| "http://127.0.0.1:8787".to_string());
+        Self::new(url)
+    }
+
     pub fn health(&self) -> Result<(), ClientError> {
         let (status, body) = self.get("/api/health")?;
         self.check_status(200, status, &body)
@@ -265,6 +273,19 @@ fn parse_item_response(body: &str) -> Result<folio_core::Item, ClientError> {
     serde_json::from_str::<ItemResponse>(body)
         .map(|r| r.item)
         .map_err(|e| ClientError::Parse(e.to_string()))
+}
+
+fn load_client_json() -> Option<String> {
+    let home = dirs::home_dir()?;
+    let path = home.join(".folio").join("client.json");
+    let content = std::fs::read_to_string(path).ok()?;
+    let config: ServerConfig = serde_json::from_str(&content).ok()?;
+    Some(config.server_url)
+}
+
+#[derive(Deserialize)]
+struct ServerConfig {
+    server_url: String,
 }
 
 #[derive(Debug, Deserialize)]
