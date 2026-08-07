@@ -1,12 +1,11 @@
 mod db;
-mod types;
 
 use axum::extract::{Path as UrlPath, Query, State};
 use axum::http::StatusCode;
 use axum::routing::{get, patch, post};
 use axum::{Json, Router};
 use clap::{Parser, Subcommand};
-use folio_core::Status;
+use folio_core::{Status, View};
 use rusqlite::Connection;
 use serde::Deserialize;
 use std::net::SocketAddr;
@@ -21,7 +20,7 @@ struct AppState {
 
 #[derive(Deserialize)]
 struct ListParams {
-    view: Option<types::View>,
+    view: Option<View>,
 }
 
 #[derive(Deserialize)]
@@ -115,7 +114,7 @@ async fn health() -> Json<serde_json::Value> {
 async fn list_items(
     State(state): State<AppState>,
     Query(params): Query<ListParams>,
-) -> Result<Json<Vec<types::ApiItem>>, StatusCode> {
+) -> Result<Json<Vec<folio_core::Item>>, StatusCode> {
     let view = params.view.unwrap_or_default();
     let conn = state.conn.lock().unwrap();
     match db::load_items(&conn, view) {

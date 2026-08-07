@@ -88,8 +88,6 @@ pub struct Item {
     pub finished_at: Option<DateTime<Utc>>,
     pub note: String,
     pub kind: Kind,
-    #[serde(rename = "_v")]
-    pub version: u8,
 }
 
 impl ItemType {
@@ -234,7 +232,6 @@ pub fn create_item(
         finished_at: None,
         note: note.unwrap_or_default(),
         kind: parsed_kind,
-        version: 1,
     };
 
     item.validate()?;
@@ -327,4 +324,13 @@ pub fn update_item_status(
     result.inbox_items = inbox_items;
     result.archive_items = archive_items;
     Ok(result)
+}
+
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum View {
+    #[default]
+    Inbox,
+    Archive,
+    All,
 }

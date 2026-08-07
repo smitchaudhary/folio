@@ -5,9 +5,6 @@ pub struct Config {
     pub max_items: u32,
 
     pub archive_on_overflow: OverflowStrategy,
-
-    #[serde(rename = "_v")]
-    pub version: u8,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -25,7 +22,6 @@ impl Config {
         Self {
             max_items: 30,
             archive_on_overflow: OverflowStrategy::Abort,
-            version: 1,
         }
     }
 }

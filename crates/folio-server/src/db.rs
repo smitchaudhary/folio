@@ -1,4 +1,4 @@
-use crate::types::{ApiItem, View};
+use folio_core::{Item, View};
 use chrono::{DateTime, Utc};
 use folio_core::{ItemType, Kind, OverflowStrategy, Status};
 use rusqlite::{Connection, params};
@@ -55,12 +55,11 @@ pub fn init_schema(conn: &Connection) -> rusqlite::Result<()> {
         CREATE TABLE IF NOT EXISTS config (
             id                  INTEGER PRIMARY KEY CHECK (id = 1),
             max_items           INTEGER NOT NULL,
-            archive_on_overflow TEXT NOT NULL,
-            _v                  INTEGER NOT NULL
+            archive_on_overflow TEXT NOT NULL
         );
 
-        INSERT OR IGNORE INTO config (id, max_items, archive_on_overflow, _v)
-        VALUES (1, 30, 'abort', 1);
+        INSERT OR IGNORE INTO config (id, max_items, archive_on_overflow)
+        VALUES (1, 30, 'abort');
         ",
     )?;
     conn.pragma_update(None, "user_version", SCHEMA_VERSION)?;
@@ -84,7 +83,7 @@ struct ItemRow {
 pub fn load_items(
     conn: &Connection,
     view: View,
-) -> Result<Vec<ApiItem>, Box<dyn std::error::Error>> {
+) -> Result<Vec<Item>, Box<dyn std::error::Error>> {
     let where_clause = match view {
         View::Inbox => " WHERE status != 'done'",
         View::Archive => " WHERE status = 'done'",
@@ -116,7 +115,7 @@ pub fn load_items(
     let mut items = Vec::new();
     for row in rows {
         let row = row?;
-        items.push(ApiItem {
+        items.push(Item {
             id: row.id,
             name: row.name,
             item_type: ItemType::from_str(&row.item_type)?,
@@ -171,7 +170,7 @@ pub fn load_config(conn: &Connection) -> Result<folio_core::Config, Box<dyn std:
     Ok(folio_core::Config {
         max_items,
         archive_on_overflow,
-        version: 1,
+
     })
 }
 
@@ -210,7 +209,7 @@ pub fn save_config(
     Ok(folio_core::Config {
         max_items,
         archive_on_overflow,
-        version: 1,
+
     })
 }
 
@@ -235,7 +234,7 @@ pub enum DbError {
 pub fn add_item(
     conn: &mut Connection,
     mut new_item: folio_core::Item,
-) -> Result<(ApiItem, Vec<ApiItem>), DbError> {
+) -> Result<(Item, Vec<Item>), DbError> {
     let tx = conn.transaction().map_err(|e| DbError::Other(e.into()))?;
     let config = load_config(&tx).map_err(|e| DbError::Other(e.into()))?;
 
@@ -246,8 +245,7 @@ pub fn add_item(
         folio_core::update_timestamps(&mut new_item);
     } else {
         let inbox_rows = load_items(&tx, View::Inbox).map_err(|e| DbError::Other(e.into()))?;
-        let inbox_core: Vec<folio_core::Item> =
-            inbox_rows.iter().cloned().map(Into::into).collect();
+        let inbox_core = inbox_rows;
 
         let (_, to_archive) = folio_core::add_item_to_inbox(inbox_core, new_item.clone(), &config)
             .map_err(|e| match e {
@@ -269,11 +267,11 @@ pub fn add_item(
                 ],
             )
             .map_err(|e| DbError::Other(e.into()))?;
-            overflow_api.push(ApiItem::from_core(item.clone()));
+            overflow_api.push(item.clone());
         }
     }
 
-    let api_item = ApiItem::from_core(new_item.clone());
+    let api_item = new_item.clone();
     let archive = api_item.status == folio_core::Status::Done;
     let position = next_position(&tx, archive).map_err(|e| DbError::Other(e.into()))?;
     let now = Utc::now();
@@ -309,10 +307,10 @@ pub fn add_item(
 }
 
 pub struct StatusResult {
-    pub item: ApiItem,
+    pub item: Item,
     pub moved_to_archive: bool,
     pub moved_to_inbox: bool,
-    pub overflow: Vec<ApiItem>,
+    pub overflow: Vec<Item>,
 }
 
 pub fn update_item_status(
@@ -325,8 +323,8 @@ pub fn update_item_status(
 
     let inbox_rows = load_items(&tx, View::Inbox).map_err(|e| DbError::Other(e.into()))?;
     let archive_rows = load_items(&tx, View::Archive).map_err(|e| DbError::Other(e.into()))?;
-    let inbox_core: Vec<folio_core::Item> = inbox_rows.iter().cloned().map(Into::into).collect();
-    let archive_core: Vec<folio_core::Item> = archive_rows.iter().cloned().map(Into::into).collect();
+    let inbox_core = inbox_rows;
+    let archive_core = archive_rows;
 
     let result = folio_core::update_item_status(id, new_status, inbox_core, archive_core, &config)
         .map_err(|e| match e {
@@ -388,13 +386,13 @@ pub fn update_item_status(
             ],
         )
         .map_err(|e| DbError::Other(e.into()))?;
-        overflow_api.push(ApiItem::from_core(item.clone()));
+        overflow_api.push(item.clone());
     }
 
     tx.commit().map_err(|e| DbError::Other(e.into()))?;
 
     Ok(StatusResult {
-        item: ApiItem::from_core(target.clone()),
+        item: target.clone(),
         moved_to_archive: !result.moved_to_archive.is_empty(),
         moved_to_inbox: result.moved_to_inbox,
         overflow: overflow_api,
@@ -409,7 +407,7 @@ pub fn edit_item(
     author: Option<String>,
     link: Option<String>,
     note: Option<String>,
-) -> Result<ApiItem, DbError> {
+) -> Result<Item, DbError> {
     let tx = conn.transaction().map_err(|e| DbError::Other(e.into()))?;
     let all_rows = load_items(&tx, View::All).map_err(|e| DbError::Other(e.into()))?;
     let item = all_rows
@@ -418,7 +416,7 @@ pub fn edit_item(
         .cloned()
         .ok_or(DbError::NotFound)?;
 
-    let mut core_item: folio_core::Item = item.into();
+    let mut core_item = item;
     if let Some(name) = name {
         core_item.name = name;
     }
@@ -439,7 +437,7 @@ pub fn edit_item(
         .validate()
         .map_err(|e| DbError::Validation(e.to_string()))?;
 
-    let updated = ApiItem::from_core(core_item);
+    let updated = core_item;
     let now = Utc::now();
     let kind_str = match &updated.kind {
         folio_core::Kind::Normal => "normal",
@@ -483,7 +481,7 @@ pub fn delete_item(conn: &mut Connection, id: &str) -> Result<(), DbError> {
     Ok(())
 }
 
-pub fn toggle_kind(conn: &mut Connection, id: &str) -> Result<ApiItem, DbError> {
+pub fn toggle_kind(conn: &mut Connection, id: &str) -> Result<Item, DbError> {
     let tx = conn.transaction().map_err(|e| DbError::Other(e.into()))?;
     let all_rows = load_items(&tx, View::All).map_err(|e| DbError::Other(e.into()))?;
     let mut item = all_rows
