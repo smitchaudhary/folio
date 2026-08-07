@@ -2,10 +2,7 @@ use clap::Parser;
 use folio_bin::cli::{Cli, Commands, ConfigSubcommands};
 use folio_bin::error::{CliError, print_error};
 use folio_core::{ItemType, Kind, OverflowStrategy, Status, View};
-use folio_storage::{
-    ConfigManager, get_archive_path, get_inbox_path, load_items_from_file,
-    save_inbox,
-};
+use folio_storage::ConfigManager;
 
 use std::str::FromStr;
 
@@ -62,7 +59,7 @@ async fn run() -> Result<(), CliError> {
                 handle_set_status_command(&client, *id, status, *archive).await?;
             }
             Commands::Edit { id, archive } => {
-                handle_edit_command(*id, *archive).await?;
+                handle_edit_command(&client, *id, *archive).await?;
             }
             Commands::Archive { id } => {
                 handle_archive_command(&client, *id).await?;
@@ -71,7 +68,7 @@ async fn run() -> Result<(), CliError> {
                 handle_delete_command(&client, *id, *archive).await?;
             }
             Commands::MarkRef { id, archive } => {
-                handle_mark_ref_command(*id, *archive).await?;
+                handle_mark_ref_command(&client, *id, *archive).await?;
             }
             Commands::Config { subcommand } => {
                 handle_config_command(subcommand).await?;
@@ -215,20 +212,19 @@ async fn handle_set_status_command(
     Ok(())
 }
 
-async fn handle_edit_command(id: usize, archive: bool) -> Result<(), CliError> {
-    let inbox_path = get_inbox_path()?;
-    let archive_path = get_archive_path()?;
-
-    let mut inbox_items = load_items_from_file(&inbox_path)?;
-    let mut archive_items = load_items_from_file(&archive_path)?;
-
-    let view_items: &mut Vec<folio_core::Item> = if archive {
-        &mut archive_items
+async fn handle_edit_command(
+    client: &folio_client::Client,
+    id: usize,
+    archive: bool,
+) -> Result<(), CliError> {
+    let view = if archive {
+        View::Archive
     } else {
-        &mut inbox_items
+        View::Inbox
     };
-    let index = resolve_item_index(id, view_items.len())?;
-    let item = &mut view_items[index];
+    let items = client.list_items(view).map_err(|e| map_client_error(id, e))?;
+    let index = resolve_item_index(id, items.len())?;
+    let item = &items[index];
 
     let original_name = item.name.clone();
     let original_type = format!("{:?}", item.item_type);
@@ -239,44 +235,42 @@ async fn handle_edit_command(id: usize, archive: bool) -> Result<(), CliError> {
     println!("Editing item #{}. Leave blank to keep current value.", id);
     println!("Current name: {}", original_name);
     let name_input = prompt_for_input("Name").await?;
-    if !name_input.is_empty() {
-        item.name = name_input;
-    }
 
     println!("Current type: {}", original_type);
     let type_input = prompt_for_input("Type").await?;
-    if !type_input.is_empty() {
-        item.item_type =
-            ItemType::from_str(&type_input).map_err(|_| CliError::InvalidItemType {
-                item_type: type_input,
-            })?;
-    }
 
     println!("Current author: {}", original_author);
     let author_input = prompt_for_input("Author").await?;
-    if !author_input.is_empty() {
-        item.author = author_input;
-    }
 
     println!("Current link: {}", original_link);
     let link_input = prompt_for_input("Link").await?;
-    if !link_input.is_empty() {
-        item.link = link_input;
-    }
 
     println!("Current note: {}", original_note);
     let note_input = prompt_for_input("Note").await?;
+
+    let mut request = folio_client::EditItemRequest::default();
+    if !name_input.is_empty() {
+        request.name = Some(name_input);
+    }
+    if !type_input.is_empty() {
+        ItemType::from_str(&type_input).map_err(|_| CliError::InvalidItemType {
+            item_type: type_input.clone(),
+        })?;
+        request.item_type = Some(type_input);
+    }
+    if !author_input.is_empty() {
+        request.author = Some(author_input);
+    }
+    if !link_input.is_empty() {
+        request.link = Some(link_input);
+    }
     if !note_input.is_empty() {
-        item.note = note_input;
+        request.note = Some(note_input);
     }
 
-    item.validate()?;
-
-    if archive {
-        folio_storage::save_archive(&archive_items)?;
-    } else {
-        save_inbox(&inbox_items)?;
-    }
+    client
+        .edit_item(&item.id, request)
+        .map_err(|e| map_client_error(id, e))?;
 
     println!("Item #{} updated successfully", id);
     Ok(())
@@ -350,13 +344,13 @@ async fn handle_delete_command(
     Ok(())
 }
 
-async fn handle_mark_ref_command(id: usize, archive: bool) -> Result<(), CliError> {
-    let inbox_path = get_inbox_path()?;
-    let archive_path = get_archive_path()?;
-    let inbox_items = load_items_from_file(&inbox_path)?;
-    let mut archive_items = load_items_from_file(&archive_path)?;
-
+async fn handle_mark_ref_command(
+    client: &folio_client::Client,
+    id: usize,
+    archive: bool,
+) -> Result<(), CliError> {
     if !archive {
+        let inbox_items = client.list_items(View::Inbox).map_err(|e| map_client_error(id, e))?;
         if resolve_item_index(id, inbox_items.len()).is_ok() {
             println!(
                 "Cannot mark reference for items in inbox. Only archived (done) items can be marked as references. Use 'folio mark-ref --archive <id>'."
@@ -366,19 +360,14 @@ async fn handle_mark_ref_command(id: usize, archive: bool) -> Result<(), CliErro
         return Err(CliError::ItemNotFound { id });
     }
 
+    let archive_items = client.list_items(View::Archive).map_err(|e| map_client_error(id, e))?;
     let index = resolve_item_index(id, archive_items.len())?;
-    let item = &mut archive_items[index];
+    let item = client
+        .toggle_kind(&archive_items[index].id)
+        .map_err(|e| map_client_error(id, e))?;
     match item.kind {
-        folio_core::Kind::Normal => {
-            item.kind = folio_core::Kind::Reference;
-            folio_storage::save_archive(&archive_items)?;
-            println!("Item #{} marked as reference", id);
-        }
-        folio_core::Kind::Reference => {
-            item.kind = folio_core::Kind::Normal;
-            folio_storage::save_archive(&archive_items)?;
-            println!("Item #{} unmarked as reference", id);
-        }
+        folio_core::Kind::Reference => println!("Item #{} marked as reference", id),
+        folio_core::Kind::Normal => println!("Item #{} unmarked as reference", id),
     }
 
     Ok(())
