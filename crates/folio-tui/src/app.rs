@@ -68,7 +68,7 @@ impl App {
         app
     }
 
-    pub async fn load_data(&mut self) -> TuiResult<()> {
+    pub fn load_data(&mut self) -> TuiResult<()> {
         let inbox_items = self.client.list_items(folio_core::View::Inbox)?;
         let archive_items = self.client.list_items(folio_core::View::Archive)?;
 
@@ -78,7 +78,7 @@ impl App {
         Ok(())
     }
 
-    async fn refresh_data(&mut self) -> TuiResult<()> {
+    fn refresh_data(&mut self) -> TuiResult<()> {
         let previous_row = self.state.selected_table_row();
         let inbox_items = self.client.list_items(folio_core::View::Inbox)?;
         let archive_items = self.client.list_items(folio_core::View::Archive)?;
@@ -91,7 +91,7 @@ impl App {
         Ok(())
     }
 
-    async fn change_selected_status(&mut self, new_status: folio_core::Status) {
+    fn change_selected_status(&mut self, new_status: folio_core::Status) {
         let selected_id = match self.state.selected_item_id.clone() {
             Some(id) => id,
             None => {
@@ -102,7 +102,7 @@ impl App {
 
         match self.client.change_status(&selected_id, new_status.clone()) {
             Ok(result) => {
-                let _ = self.refresh_data().await;
+                let _ = self.refresh_data();
                 if result.moved_to_inbox && !result.overflow.is_empty() {
                     self.show_status_message(format!(
                         "Moved to inbox. {} item(s) archived due to overflow",
@@ -132,7 +132,7 @@ impl App {
         self.status_message = Some((message, Instant::now()));
     }
 
-    async fn handle_key_event(&mut self, key_event: KeyEvent) {
+    fn handle_key_event(&mut self, key_event: KeyEvent) {
         if self.show_help {
             if let KeyCode::Char('?') | KeyCode::Esc = key_event.code {
                 self.show_help = false;
@@ -150,7 +150,7 @@ impl App {
         if self.show_delete_confirmation {
             match key_event.code {
                 KeyCode::Char('y') | KeyCode::Char('Y') => {
-                    self.delete_selected_item().await;
+                    self.delete_selected_item();
                     self.show_delete_confirmation = false;
                 }
                 KeyCode::Char('n') | KeyCode::Char('N') | KeyCode::Esc => {
@@ -164,7 +164,7 @@ impl App {
         if self.show_done_confirmation {
             match key_event.code {
                 KeyCode::Char('y') | KeyCode::Char('Y') => {
-                    self.change_selected_status(folio_core::Status::Done).await;
+                    self.change_selected_status(folio_core::Status::Done);
                     self.show_done_confirmation = false;
                 }
                 KeyCode::Char('n') | KeyCode::Char('N') | KeyCode::Esc => {
@@ -208,7 +208,7 @@ impl App {
                     self.add_form.toggle_visibility();
                 }
                 KeyCode::Enter => {
-                    if let Some(item_id) = self.submit_add_form().await {
+                    if let Some(item_id) = self.submit_add_form() {
                         self.state.selected_item_id = Some(item_id);
                         self.table_state.select(self.state.selected_table_row());
                         self.add_form.toggle_visibility();
@@ -227,7 +227,7 @@ impl App {
                     self.edit_form.toggle_visibility();
                 }
                 KeyCode::Enter => {
-                    if self.submit_edit_form().await {
+                    if self.submit_edit_form() {
                         self.edit_form.toggle_visibility();
                     }
                 }
@@ -299,7 +299,7 @@ impl App {
             KeyCode::Char('J') => match self.state.selected_item_id.clone() {
                 Some(selected_id) => match self.client.move_item(&selected_id, "down") {
                     Ok(_) => {
-                        let _ = self.refresh_data().await;
+                        let _ = self.refresh_data();
                         self.state.selected_item_id = Some(selected_id);
                         self.table_state.select(self.state.selected_table_row());
                         self.show_status_message("Item moved down".to_string());
@@ -315,7 +315,7 @@ impl App {
             KeyCode::Char('K') => match self.state.selected_item_id.clone() {
                 Some(selected_id) => match self.client.move_item(&selected_id, "up") {
                     Ok(_) => {
-                        let _ = self.refresh_data().await;
+                        let _ = self.refresh_data();
                         self.state.selected_item_id = Some(selected_id);
                         self.table_state.select(self.state.selected_table_row());
                         self.show_status_message("Item moved up".to_string());
@@ -345,10 +345,10 @@ impl App {
                 self.table_state.select(self.state.selected_table_row());
             }
             KeyCode::Char('t') => {
-                self.change_selected_status(folio_core::Status::Todo).await;
+                self.change_selected_status(folio_core::Status::Todo);
             }
             KeyCode::Char('i') => {
-                self.change_selected_status(folio_core::Status::Doing).await;
+                self.change_selected_status(folio_core::Status::Doing);
             }
             KeyCode::Char('d') => {
                 if self.state.selected_item().is_some() {
@@ -363,7 +363,7 @@ impl App {
                 self.show_delete_confirmation = true;
             }
             KeyCode::Char('r') => {
-                self.toggle_reference_status().await;
+                self.toggle_reference_status();
                 self.show_status_message("Reference status toggled".to_string());
             }
             KeyCode::Char('e') => {
@@ -517,7 +517,7 @@ impl App {
         }
     }
 
-    async fn toggle_reference_status(&mut self) {
+    fn toggle_reference_status(&mut self) {
         if self.state.current_view != View::Archive {
             return;
         }
@@ -529,7 +529,7 @@ impl App {
 
         match self.client.toggle_kind(&selected_id) {
             Ok(_) => {
-                let _ = self.refresh_data().await;
+                let _ = self.refresh_data();
             }
             Err(_) => {
                 self.show_status_message("Failed to toggle reference".to_string());
@@ -587,7 +587,7 @@ impl App {
         }
     }
 
-    async fn delete_selected_item(&mut self) {
+    fn delete_selected_item(&mut self) {
         let selected_id = match self.state.selected_item_id.clone() {
             Some(id) => id,
             None => return,
@@ -595,7 +595,7 @@ impl App {
 
         match self.client.delete_item(&selected_id) {
             Ok(()) => {
-                let _ = self.refresh_data().await;
+                let _ = self.refresh_data();
                 self.show_status_message("Item deleted".to_string());
             }
             Err(_) => {
@@ -604,7 +604,7 @@ impl App {
         }
     }
 
-    async fn submit_add_form(&mut self) -> Option<String> {
+    fn submit_add_form(&mut self) -> Option<String> {
         let name = self
             .add_form
             .get_field_value("name")
@@ -643,7 +643,7 @@ impl App {
 
         match self.client.add_item(request) {
             Ok((item, to_archive)) => {
-                let _ = self.refresh_data().await;
+                let _ = self.refresh_data();
 
                 if !to_archive.is_empty() {
                     self.show_status_message(format!(
@@ -674,7 +674,7 @@ impl App {
         }
     }
 
-    async fn submit_edit_form(&mut self) -> bool {
+    fn submit_edit_form(&mut self) -> bool {
         let name = self
             .edit_form
             .get_field_value("name")
@@ -720,7 +720,7 @@ impl App {
 
         match self.client.edit_item(&selected_id, request) {
             Ok(_) => {
-                let _ = self.refresh_data().await;
+                let _ = self.refresh_data();
                 self.show_status_message("Item updated".to_string());
                 true
             }
@@ -732,7 +732,7 @@ impl App {
     }
 
     pub async fn run(&mut self) -> TuiResult<()> {
-        self.load_data().await?;
+        self.load_data()?;
 
         let mut terminal = setup_terminal()?;
         let mut events = EventHandler::new(Duration::from_millis(250));
@@ -797,7 +797,7 @@ impl App {
             if let Some(event) = events.next().await {
                 match event {
                     AppEvent::Key(key_event) => {
-                        self.handle_key_event(key_event).await;
+                        self.handle_key_event(key_event);
                     }
                     AppEvent::Mouse(mouse_event) => {
                         self.handle_mouse_event(mouse_event);
