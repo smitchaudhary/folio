@@ -241,9 +241,8 @@ pub fn add_item(
         folio_core::update_timestamps(&mut new_item);
     } else {
         let inbox_rows = load_items(&tx, View::Inbox).map_err(DbError::Other)?;
-        let inbox_core = inbox_rows;
 
-        let (_, to_archive) = folio_core::add_item_to_inbox(inbox_core, new_item.clone(), &config)
+        let (_, to_archive) = folio_core::add_item_to_inbox(inbox_rows, new_item.clone(), &config)
             .map_err(|e| match e {
                 folio_core::CoreError::InboxFull => DbError::InboxFull,
                 other => DbError::Other(other.into()),
@@ -319,10 +318,8 @@ pub fn update_item_status(
 
     let inbox_rows = load_items(&tx, View::Inbox).map_err(DbError::Other)?;
     let archive_rows = load_items(&tx, View::Archive).map_err(DbError::Other)?;
-    let inbox_core = inbox_rows;
-    let archive_core = archive_rows;
 
-    let result = folio_core::update_item_status(id, new_status, inbox_core, archive_core, &config)
+    let result = folio_core::update_item_status(id, new_status, inbox_rows, archive_rows, &config)
         .map_err(|e| match e {
             folio_core::CoreError::InboxFull => DbError::InboxFull,
             other => DbError::Other(other.into()),
