@@ -3,6 +3,7 @@ use folio_bin::cli::{Cli, Commands, ConfigSubcommands};
 use folio_bin::error::{CliError, print_error};
 use folio_core::{ItemType, Kind, OverflowStrategy, Status, View};
 
+use std::io::{Write, stdin, stdout};
 use std::str::FromStr;
 
 fn main() {
@@ -312,7 +313,6 @@ fn handle_delete_command(
     println!("  Link: {}", item.link);
 
     print!("Delete this item permanently? (y/N): ");
-    use std::io::{Write, stdin, stdout};
     stdout().flush()?;
 
     let mut input = String::new();
@@ -427,7 +427,6 @@ async fn handle_add_command(
             println!();
             println!("Would you like to see the current inbox items? (y/N): ");
 
-            use std::io::{Write, stdin, stdout};
             stdout().flush()?;
             let mut input = String::new();
             tokio::task::block_in_place(|| stdin().read_line(&mut input))?;
