@@ -482,7 +482,7 @@ impl App {
         } else if link.starts_with("http://") || link.starts_with("https://") {
             Some(link.to_string())
         } else {
-            Some(format!("https://{}", link))
+            Some(format!("https://{link}"))
         }
     }
 
@@ -986,11 +986,10 @@ impl App {
 
         let text = vec![
             ratatui::text::Line::from(""),
-            ratatui::text::Line::from(format!("Max Items: {}", max_items_input)),
+            ratatui::text::Line::from(format!("Max Items: {max_items_input}")),
             ratatui::text::Line::from(""),
             ratatui::text::Line::from(format!(
-                "Overflow Strategy: {} (↑/↓ to cycle)",
-                selected_strategy
+                "Overflow Strategy: {selected_strategy} (↑/↓ to cycle)"
             )),
             ratatui::text::Line::from(""),
             ratatui::text::Line::from("Controls:"),
@@ -1027,9 +1026,9 @@ impl App {
         };
 
         let status_text = if message_text.is_empty() {
-            format!("View: {} | Press ? for help", view_text)
+            format!("View: {view_text} | Press ? for help")
         } else {
-            format!("{} | View: {} | Press ? for help", message_text, view_text)
+            format!("{message_text} | View: {view_text} | Press ? for help")
         };
 
         let paragraph = ratatui::widgets::Paragraph::new(status_text)
@@ -1059,7 +1058,7 @@ impl App {
             .borders(ratatui::widgets::Borders::ALL);
 
         let text = vec![
-            ratatui::text::Line::from(format!("Filter: {}", filter_input)),
+            ratatui::text::Line::from(format!("Filter: {filter_input}")),
             ratatui::text::Line::from("Press Enter to apply, Esc to cancel"),
         ];
 

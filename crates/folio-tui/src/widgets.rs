@@ -14,7 +14,7 @@ impl ItemsTable {
         let (header, title, border_style) = match app_state.current_view {
             View::Inbox => {
                 let title = if let Some(filter) = &app_state.filter {
-                    format!(" Inbox (filtered: {}) ", filter)
+                    format!(" Inbox (filtered: {filter}) ")
                 } else {
                     " Inbox ".to_string()
                 };
@@ -27,7 +27,7 @@ impl ItemsTable {
             }
             View::Archive => {
                 let title = if let Some(filter) = &app_state.filter {
-                    format!(" Archive (filtered: {}) ", filter)
+                    format!(" Archive (filtered: {filter}) ")
                 } else {
                     " Archive ".to_string()
                 };

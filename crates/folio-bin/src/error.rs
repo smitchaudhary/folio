@@ -99,7 +99,7 @@ impl From<folio_core::CoreError> for CliError {
 }
 
 pub fn print_error(error: &CliError) {
-    eprintln!("Error: {}", error);
+    eprintln!("Error: {error}");
     eprintln!();
     eprintln!("For help, try:");
     eprintln!("folio --help");

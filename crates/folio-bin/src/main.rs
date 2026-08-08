@@ -181,10 +181,7 @@ fn handle_set_status_command(
         .map_err(|e| map_client_error(id, e))?;
 
     if result.moved_to_archive {
-        println!(
-            "Item #{} status updated to '{}' and moved to archive",
-            id, status_str
-        );
+        println!("Item #{id} status updated to '{status_str}' and moved to archive");
     } else if result.moved_to_inbox {
         if !result.overflow.is_empty() {
             println!(
@@ -197,13 +194,10 @@ fn handle_set_status_command(
                 println!("  - {} ({})", item.name, item.status.as_string());
             }
         } else {
-            println!(
-                "Item #{} status updated to '{}' and moved to inbox",
-                id, status_str
-            );
+            println!("Item #{id} status updated to '{status_str}' and moved to inbox");
         }
     } else {
-        println!("Item #{} status updated to '{}'", id, status_str);
+        println!("Item #{id} status updated to '{status_str}'");
     }
 
     Ok(())
@@ -227,20 +221,20 @@ fn handle_edit_command(
     let original_link = item.link.clone();
     let original_note = item.note.clone();
 
-    println!("Editing item #{}. Leave blank to keep current value.", id);
-    println!("Current name: {}", original_name);
+    println!("Editing item #{id}. Leave blank to keep current value.");
+    println!("Current name: {original_name}");
     let name_input = prompt_for_input("Name")?;
 
-    println!("Current type: {}", original_type);
+    println!("Current type: {original_type}");
     let type_input = prompt_for_input("Type")?;
 
-    println!("Current author: {}", original_author);
+    println!("Current author: {original_author}");
     let author_input = prompt_for_input("Author")?;
 
-    println!("Current link: {}", original_link);
+    println!("Current link: {original_link}");
     let link_input = prompt_for_input("Link")?;
 
-    println!("Current note: {}", original_note);
+    println!("Current note: {original_note}");
     let note_input = prompt_for_input("Note")?;
 
     let mut request = folio_client::EditItemRequest::default();
@@ -267,7 +261,7 @@ fn handle_edit_command(
         .edit_item(&item.id, request)
         .map_err(|e| map_client_error(id, e))?;
 
-    println!("Item #{} updated successfully", id);
+    println!("Item #{id} updated successfully");
     Ok(())
 }
 
@@ -281,7 +275,7 @@ fn handle_archive_command(client: &folio_client::Client, id: usize) -> Result<()
             client
                 .change_status(&stable_id, Status::Done)
                 .map_err(|e| map_client_error(id, e))?;
-            println!("Item #{} marked as done and archived successfully", id);
+            println!("Item #{id} marked as done and archived successfully");
             Ok(())
         }
         Err(_) => {
@@ -289,7 +283,7 @@ fn handle_archive_command(client: &folio_client::Client, id: usize) -> Result<()
                 .list_items(View::Archive)
                 .map_err(|e| map_client_error(id, e))?;
             if resolve_item_index(id, archive_items.len()).is_ok() {
-                println!("Item #{} is already in archive", id);
+                println!("Item #{id} is already in archive");
                 Ok(())
             } else {
                 Err(CliError::ItemNotFound { id })
@@ -334,7 +328,7 @@ fn handle_delete_command(
         .delete_item(&item.id)
         .map_err(|e| map_client_error(id, e))?;
 
-    println!("Item #{} deleted successfully", id);
+    println!("Item #{id} deleted successfully");
     Ok(())
 }
 
@@ -364,8 +358,8 @@ fn handle_mark_ref_command(
         .toggle_kind(&archive_items[index].id)
         .map_err(|e| map_client_error(id, e))?;
     match item.kind {
-        folio_core::Kind::Reference => println!("Item #{} marked as reference", id),
-        folio_core::Kind::Normal => println!("Item #{} unmarked as reference", id),
+        folio_core::Kind::Reference => println!("Item #{id} marked as reference"),
+        folio_core::Kind::Normal => println!("Item #{id} unmarked as reference"),
     }
 
     Ok(())
@@ -374,7 +368,7 @@ fn handle_mark_ref_command(
 fn prompt_for_input(field_name: &str) -> Result<String, CliError> {
     use std::io::{Write, stdin, stdout};
 
-    print!("{}: ", field_name);
+    print!("{field_name}: ");
     stdout().flush()?;
 
     let mut input = String::new();
@@ -466,7 +460,7 @@ fn handle_config_command(
         ConfigSubcommands::List => {
             let config = client.get_config()?;
             let json = serde_json::to_string_pretty(&config)?;
-            println!("{}", json);
+            println!("{json}");
         }
         ConfigSubcommands::Get { key } => {
             let config = client.get_config()?;
