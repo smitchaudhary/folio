@@ -232,7 +232,7 @@ pub fn add_item(
     mut new_item: folio_core::Item,
 ) -> Result<(Item, Vec<Item>), DbError> {
     let tx = conn.transaction().map_err(|e| DbError::Other(e.into()))?;
-    let config = load_config(&tx).map_err(|e| DbError::Other(e.into()))?;
+    let config = load_config(&tx).map_err(DbError::Other)?;
 
     let mut overflow_api = Vec::new();
 
@@ -240,7 +240,7 @@ pub fn add_item(
         new_item.status = folio_core::Status::Done;
         folio_core::update_timestamps(&mut new_item);
     } else {
-        let inbox_rows = load_items(&tx, View::Inbox).map_err(|e| DbError::Other(e.into()))?;
+        let inbox_rows = load_items(&tx, View::Inbox).map_err(DbError::Other)?;
         let inbox_core = inbox_rows;
 
         let (_, to_archive) = folio_core::add_item_to_inbox(inbox_core, new_item.clone(), &config)
@@ -315,10 +315,10 @@ pub fn update_item_status(
     new_status: folio_core::Status,
 ) -> Result<StatusResult, DbError> {
     let tx = conn.transaction().map_err(|e| DbError::Other(e.into()))?;
-    let config = load_config(&tx).map_err(|e| DbError::Other(e.into()))?;
+    let config = load_config(&tx).map_err(DbError::Other)?;
 
-    let inbox_rows = load_items(&tx, View::Inbox).map_err(|e| DbError::Other(e.into()))?;
-    let archive_rows = load_items(&tx, View::Archive).map_err(|e| DbError::Other(e.into()))?;
+    let inbox_rows = load_items(&tx, View::Inbox).map_err(DbError::Other)?;
+    let archive_rows = load_items(&tx, View::Archive).map_err(DbError::Other)?;
     let inbox_core = inbox_rows;
     let archive_core = archive_rows;
 
@@ -405,7 +405,7 @@ pub fn edit_item(
     note: Option<String>,
 ) -> Result<Item, DbError> {
     let tx = conn.transaction().map_err(|e| DbError::Other(e.into()))?;
-    let all_rows = load_items(&tx, View::All).map_err(|e| DbError::Other(e.into()))?;
+    let all_rows = load_items(&tx, View::All).map_err(DbError::Other)?;
     let item = all_rows
         .iter()
         .find(|row| row.id == id)
@@ -479,7 +479,7 @@ pub fn delete_item(conn: &mut Connection, id: &str) -> Result<(), DbError> {
 
 pub fn toggle_kind(conn: &mut Connection, id: &str) -> Result<Item, DbError> {
     let tx = conn.transaction().map_err(|e| DbError::Other(e.into()))?;
-    let all_rows = load_items(&tx, View::All).map_err(|e| DbError::Other(e.into()))?;
+    let all_rows = load_items(&tx, View::All).map_err(DbError::Other)?;
     let mut item = all_rows
         .iter()
         .find(|row| row.id == id)
@@ -523,7 +523,7 @@ pub fn move_item(
 ) -> Result<Item, DbError> {
     let tx = conn.transaction().map_err(|e| DbError::Other(e.into()))?;
 
-    let all_rows = load_items(&tx, View::All).map_err(|e| DbError::Other(e.into()))?;
+    let all_rows = load_items(&tx, View::All).map_err(DbError::Other)?;
     let target = all_rows
         .iter()
         .find(|item| item.id == id)

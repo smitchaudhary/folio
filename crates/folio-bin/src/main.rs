@@ -439,9 +439,9 @@ async fn handle_add_command(
             tokio::task::block_in_place(|| stdin().read_line(&mut input))?;
             let response = input.trim().to_lowercase();
 
-            if response == "y" || response == "yes" {
-                if let Ok(inbox_items) = client.list_items(folio_core::View::Inbox) {
-                    if !inbox_items.is_empty() {
+            if (response == "y" || response == "yes")
+                && let Ok(inbox_items) = client.list_items(folio_core::View::Inbox)
+                    && !inbox_items.is_empty() {
                         println!();
                         println!("{}", folio_core::Item::format_list_header());
                         println!("{}", folio_core::Item::format_list_separator());
@@ -450,8 +450,6 @@ async fn handle_add_command(
                             println!("{}", item.format_for_list(index + 1));
                         }
                     }
-                }
-            }
 
             std::process::exit(1);
         }
