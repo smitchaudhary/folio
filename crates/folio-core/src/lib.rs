@@ -71,6 +71,13 @@ impl Kind {
             Kind::Reference => "🔖",
         }
     }
+
+    pub fn as_string(&self) -> &'static str {
+        match self {
+            Kind::Normal => "normal",
+            Kind::Reference => "reference",
+        }
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

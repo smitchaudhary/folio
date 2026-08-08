@@ -5,7 +5,7 @@ use axum::http::StatusCode;
 use axum::routing::{get, patch, post};
 use axum::{Json, Router};
 use clap::{Parser, Subcommand};
-use folio_core::{Status, View};
+use folio_core::{OverflowStrategy, Status, View};
 use rusqlite::Connection;
 use serde::Deserialize;
 use std::net::SocketAddr;
@@ -292,7 +292,7 @@ async fn get_config(
     match db::load_config(&conn) {
         Ok(config) => Ok(Json(serde_json::json!({
             "max_items": config.max_items,
-            "archive_on_overflow": db::strategy_to_str(&config.archive_on_overflow),
+            "archive_on_overflow": config.archive_on_overflow.as_string(),
         }))),
         Err(e) => Err(db_error_response("", db::DbError::Other(e))),
     }
@@ -308,9 +308,9 @@ async fn update_config(
     State(state): State<AppState>,
     Json(body): Json<UpdateConfigRequest>,
 ) -> Result<(StatusCode, Json<serde_json::Value>), (StatusCode, Json<serde_json::Value>)> {
-    let strategy = match db::parse_strategy(&body.archive_on_overflow) {
-        Some(s) => s,
-        None => {
+    let strategy = match OverflowStrategy::from_str(&body.archive_on_overflow) {
+        Ok(s) => s,
+        Err(_) => {
             return Err(error_response(
                 StatusCode::BAD_REQUEST,
                 "invalid_overflow_strategy",
@@ -325,7 +325,7 @@ async fn update_config(
             StatusCode::OK,
             Json(serde_json::json!({
                 "max_items": config.max_items,
-                "archive_on_overflow": db::strategy_to_str(&config.archive_on_overflow),
+                "archive_on_overflow": config.archive_on_overflow.as_string(),
             })),
         )),
         Err(e) => Err(db_error_response("", e)),

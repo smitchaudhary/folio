@@ -137,23 +137,6 @@ fn parse_ts_opt(s: Option<String>) -> Result<Option<DateTime<Utc>>, Box<dyn std:
     s.map(|v| parse_ts(&v)).transpose()
 }
 
-pub fn parse_strategy(s: &str) -> Option<OverflowStrategy> {
-    match s {
-        "abort" => Some(OverflowStrategy::Abort),
-        "todo" => Some(OverflowStrategy::Todo),
-        "any" => Some(OverflowStrategy::Any),
-        _ => None,
-    }
-}
-
-pub fn strategy_to_str(s: &OverflowStrategy) -> &'static str {
-    match s {
-        OverflowStrategy::Abort => "abort",
-        OverflowStrategy::Todo => "todo",
-        OverflowStrategy::Any => "any",
-    }
-}
-
 pub fn load_config(conn: &Connection) -> Result<folio_core::Config, Box<dyn std::error::Error>> {
     let (max_items, strategy_str): (u32, String) = conn.query_row(
         "SELECT max_items, archive_on_overflow FROM config WHERE id = 1",
@@ -161,8 +144,8 @@ pub fn load_config(conn: &Connection) -> Result<folio_core::Config, Box<dyn std:
         |row| Ok((row.get(0)?, row.get(1)?)),
     )?;
 
-    let archive_on_overflow = parse_strategy(&strategy_str)
-        .ok_or_else(|| format!("unknown overflow strategy: {strategy_str}"))?;
+    let archive_on_overflow = OverflowStrategy::from_str(&strategy_str)
+        .map_err(|_| format!("unknown overflow strategy: {strategy_str}"))?;
 
     Ok(folio_core::Config {
         max_items,
@@ -196,7 +179,7 @@ pub fn save_config(
 
     tx.execute(
         "UPDATE config SET max_items = ?1, archive_on_overflow = ?2 WHERE id = 1",
-        params![max_items, strategy_to_str(&archive_on_overflow)],
+        params![max_items, archive_on_overflow.as_string()],
     )
     .map_err(|e| DbError::Other(e.into()))?;
 
@@ -270,10 +253,7 @@ pub fn add_item(
     let archive = api_item.status == folio_core::Status::Done;
     let position = next_position(&tx, archive).map_err(|e| DbError::Other(e.into()))?;
     let now = Utc::now();
-    let kind_str = match &api_item.kind {
-        folio_core::Kind::Normal => "normal",
-        folio_core::Kind::Reference => "reference",
-    };
+    let kind_str = api_item.kind.as_string();
 
     tx.execute(
         "INSERT INTO items (id, name, type, status, kind, author, link, note, added_at, started_at, \
@@ -432,10 +412,7 @@ pub fn edit_item(
 
     let updated = core_item;
     let now = Utc::now();
-    let kind_str = match &updated.kind {
-        folio_core::Kind::Normal => "normal",
-        folio_core::Kind::Reference => "reference",
-    };
+    let kind_str = updated.kind.as_string();
 
     tx.execute(
         "UPDATE items SET name = ?1, type = ?2, status = ?3, kind = ?4, author = ?5, link = ?6, \
@@ -492,10 +469,7 @@ pub fn toggle_kind(conn: &mut Connection, id: &str) -> Result<Item, DbError> {
         folio_core::Kind::Reference => folio_core::Kind::Normal,
     };
 
-    let kind_str = match &item.kind {
-        folio_core::Kind::Normal => "normal",
-        folio_core::Kind::Reference => "reference",
-    };
+    let kind_str = item.kind.as_string();
     let now = Utc::now();
 
     tx.execute(
