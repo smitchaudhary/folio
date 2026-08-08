@@ -225,16 +225,10 @@ impl ItemForm {
         }
 
         match key.code {
-            crossterm::event::KeyCode::Tab => {
+            crossterm::event::KeyCode::Tab | crossterm::event::KeyCode::Down => {
                 self.focus_next();
             }
-            crossterm::event::KeyCode::BackTab => {
-                self.focus_prev();
-            }
-            crossterm::event::KeyCode::Down => {
-                self.focus_next();
-            }
-            crossterm::event::KeyCode::Up => {
+            crossterm::event::KeyCode::BackTab | crossterm::event::KeyCode::Up => {
                 self.focus_prev();
             }
             crossterm::event::KeyCode::Right => {

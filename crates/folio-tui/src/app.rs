@@ -277,19 +277,11 @@ impl App {
                 self.filter_input_mode = true;
                 self.filter_input.clear();
             }
-            KeyCode::Down => {
+            KeyCode::Down | KeyCode::Char('j') => {
                 self.state.next_item();
                 self.table_state.select(self.state.selected_table_row());
             }
-            KeyCode::Up => {
-                self.state.previous_item();
-                self.table_state.select(self.state.selected_table_row());
-            }
-            KeyCode::Char('j') => {
-                self.state.next_item();
-                self.table_state.select(self.state.selected_table_row());
-            }
-            KeyCode::Char('k') => {
+            KeyCode::Up | KeyCode::Char('k') => {
                 self.state.previous_item();
                 self.table_state.select(self.state.selected_table_row());
             }
@@ -532,7 +524,6 @@ impl App {
             Ok(max_items) => {
                 if max_items > 0 && max_items <= 1000 {
                     let strategy = match self.config_overflow_strategy {
-                        0 => OverflowStrategy::Abort,
                         1 => OverflowStrategy::Todo,
                         2 => OverflowStrategy::Any,
                         _ => OverflowStrategy::Abort,
