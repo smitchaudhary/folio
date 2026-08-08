@@ -146,11 +146,11 @@ impl App {
 
         if self.show_delete_confirmation {
             match key_event.code {
-                KeyCode::Char('y') | KeyCode::Char('Y') => {
+                KeyCode::Char('y' | 'Y') => {
                     self.delete_selected_item();
                     self.show_delete_confirmation = false;
                 }
-                KeyCode::Char('n') | KeyCode::Char('N') | KeyCode::Esc => {
+                KeyCode::Char('n' | 'N') | KeyCode::Esc => {
                     self.show_delete_confirmation = false;
                 }
                 _ => {}
@@ -160,11 +160,11 @@ impl App {
 
         if self.show_done_confirmation {
             match key_event.code {
-                KeyCode::Char('y') | KeyCode::Char('Y') => {
+                KeyCode::Char('y' | 'Y') => {
                     self.change_selected_status(folio_core::Status::Done);
                     self.show_done_confirmation = false;
                 }
-                KeyCode::Char('n') | KeyCode::Char('N') | KeyCode::Esc => {
+                KeyCode::Char('n' | 'N') | KeyCode::Esc => {
                     self.show_done_confirmation = false;
                 }
                 _ => {}
