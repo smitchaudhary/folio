@@ -77,12 +77,12 @@ impl Client {
 
     pub fn health(&self) -> Result<(), ClientError> {
         let (status, body) = self.get("/api/health")?;
-        self.check_status(200, status, &body)
+        Self::check_status(200, status, &body)
     }
 
     pub fn list_items(&self, view: View) -> Result<Vec<folio_core::Item>, ClientError> {
         let (status, body) = self.get(&format!("/api/items?view={}", view.as_string()))?;
-        self.check_status(200, status, &body)?;
+        Self::check_status(200, status, &body)?;
         serde_json::from_str(&body).map_err(|e| ClientError::Parse(e.to_string()))
     }
 
@@ -104,7 +104,7 @@ impl Client {
                 serde_json::from_str(&resp_body).map_err(|e| ClientError::Parse(e.to_string()))?;
             Ok((parsed.item, parsed.overflow))
         } else {
-            Err(self.error_from_status(status, &resp_body))
+            Err(Self::error_from_status(status, &resp_body))
         }
     }
 
@@ -118,7 +118,7 @@ impl Client {
         if resp_status == 200 {
             serde_json::from_str(&resp_body).map_err(|e| ClientError::Parse(e.to_string()))
         } else {
-            Err(self.error_from_status(resp_status, &resp_body))
+            Err(Self::error_from_status(resp_status, &resp_body))
         }
     }
 
@@ -133,7 +133,7 @@ impl Client {
         if status == 200 {
             parse_item_response(&resp_body)
         } else {
-            Err(self.error_from_status(status, &resp_body))
+            Err(Self::error_from_status(status, &resp_body))
         }
     }
 
@@ -142,7 +142,7 @@ impl Client {
         if status == 204 {
             Ok(())
         } else {
-            Err(self.error_from_status(status, &body))
+            Err(Self::error_from_status(status, &body))
         }
     }
 
@@ -151,7 +151,7 @@ impl Client {
         if status == 200 {
             parse_item_response(&body)
         } else {
-            Err(self.error_from_status(status, &body))
+            Err(Self::error_from_status(status, &body))
         }
     }
 
@@ -161,13 +161,13 @@ impl Client {
         if status == 200 {
             parse_item_response(&resp_body)
         } else {
-            Err(self.error_from_status(status, &resp_body))
+            Err(Self::error_from_status(status, &resp_body))
         }
     }
 
     pub fn get_config(&self) -> Result<folio_core::Config, ClientError> {
         let (status, body) = self.get("/api/config")?;
-        self.check_status(200, status, &body)?;
+        Self::check_status(200, status, &body)?;
         serde_json::from_str(&body).map_err(|e| ClientError::Parse(e.to_string()))
     }
 
@@ -180,7 +180,7 @@ impl Client {
         if status == 200 {
             serde_json::from_str(&resp_body).map_err(|e| ClientError::Parse(e.to_string()))
         } else {
-            Err(self.error_from_status(status, &resp_body))
+            Err(Self::error_from_status(status, &resp_body))
         }
     }
 
@@ -251,15 +251,15 @@ impl Client {
         Ok((status, body))
     }
 
-    fn check_status(&self, expected: u16, status: u16, body: &str) -> Result<(), ClientError> {
+    fn check_status(expected: u16, status: u16, body: &str) -> Result<(), ClientError> {
         if status == expected {
             Ok(())
         } else {
-            Err(self.error_from_status(status, body))
+            Err(Self::error_from_status(status, body))
         }
     }
 
-    fn error_from_status(&self, status: u16, body: &str) -> ClientError {
+    fn error_from_status(status: u16, body: &str) -> ClientError {
         if let Ok(envelope) = serde_json::from_str::<ErrorEnvelope>(body) {
             if envelope.error.code == "inbox_full" {
                 ClientError::InboxFull

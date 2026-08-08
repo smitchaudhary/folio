@@ -493,7 +493,7 @@ fn handle_config_command(
                         "any" => OverflowStrategy::Any,
                         _ => {
                             return Err(CliError::InvalidOverflowStrategy {
-                                value: value.to_string(),
+                                value: value.clone(),
                             });
                         }
                     };

@@ -445,7 +445,7 @@ impl App {
         {
             match arboard::Clipboard::new() {
                 Ok(mut clipboard) => match clipboard.set_text(&link_to_use) {
-                    Ok(_) => {
+                    Ok(()) => {
                         self.show_status_message("Link copied to clipboard".to_string());
                     }
                     Err(_) => {
