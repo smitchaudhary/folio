@@ -54,7 +54,6 @@ enum Commands {
         #[arg(long, default_value = "~/.folio/folio.db", help = "Path to the database file")]
         db: PathBuf,
     },
-    Import,
 }
 
 #[tokio::main]
@@ -62,7 +61,6 @@ async fn main() {
     let cli = Cli::parse();
     match cli.command {
         Commands::Serve { bind, db } => serve(bind, &db).await,
-        Commands::Import => println!("Not implemented yet"),
     }
 }
 
