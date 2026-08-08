@@ -1,4 +1,4 @@
-use folio_core::{CoreError, Item};
+use folio_core::Item;
 
 #[derive(PartialEq)]
 pub enum View {
@@ -47,24 +47,10 @@ impl AppState {
         }
     }
 
-    pub fn current_items_mut(&mut self) -> &mut Vec<Item> {
-        match self.current_view {
-            View::Inbox => &mut self.inbox_items,
-            View::Archive => &mut self.archive_items,
-        }
-    }
-
     pub fn selected_item(&self) -> Option<&Item> {
         let selected_id = self.selected_item_id.as_ref()?;
         self.current_items()
             .iter()
-            .find(|item| item.id() == selected_id)
-    }
-
-    pub fn selected_item_mut(&mut self) -> Option<&mut Item> {
-        let selected_id = self.selected_item_id.clone()?;
-        self.current_items_mut()
-            .iter_mut()
             .find(|item| item.id() == selected_id)
     }
 
@@ -170,46 +156,6 @@ impl AppState {
         let visible: Vec<String> = self.visible_items().into_iter().map(|(id, _)| id).collect();
 
         self.selected_item_id = visible.last().cloned();
-    }
-
-    pub fn move_item_up(&mut self) -> Result<(), CoreError> {
-        let selected_id = self
-            .selected_item_id
-            .clone()
-            .ok_or(CoreError::ItemNotFound)?;
-        let items = self.current_items_mut();
-
-        let pos = items
-            .iter()
-            .position(|item| item.id() == selected_id)
-            .ok_or(CoreError::ItemNotFound)?;
-
-        if pos == 0 {
-            return Err(CoreError::ValidationError("Already at top".to_string()));
-        }
-
-        items.swap(pos, pos - 1);
-        Ok(())
-    }
-
-    pub fn move_item_down(&mut self) -> Result<(), CoreError> {
-        let selected_id = self
-            .selected_item_id
-            .clone()
-            .ok_or(CoreError::ItemNotFound)?;
-        let items = self.current_items_mut();
-
-        let pos = items
-            .iter()
-            .position(|item| item.id() == selected_id)
-            .ok_or(CoreError::ItemNotFound)?;
-
-        if pos >= items.len() - 1 {
-            return Err(CoreError::ValidationError("Already at bottom".to_string()));
-        }
-
-        items.swap(pos, pos + 1);
-        Ok(())
     }
 
     pub fn set_filter(&mut self, filter: Option<String>) {
