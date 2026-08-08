@@ -100,12 +100,14 @@ async fn handle_list_command(
 
     let view_is_empty = items.is_empty();
 
-    let filtered_items: Vec<_> = items
+    let filtered: Vec<_> = items
         .iter()
-        .filter(|item| matches_filters(item, status_filters, type_filters))
+        .enumerate()
+        .filter(|(_, item)| matches_filters(item, status_filters, type_filters))
+        .map(|(pos, item)| (pos + 1, item))
         .collect();
 
-    if filtered_items.is_empty() {
+    if filtered.is_empty() {
         if view_is_empty {
             match view {
                 View::Inbox => println!("No items in inbox."),
@@ -121,10 +123,8 @@ async fn handle_list_command(
     println!("{}", folio_core::Item::format_list_header());
     println!("{}", folio_core::Item::format_list_separator());
 
-    for (pos, item) in items.iter().enumerate() {
-        if matches_filters(item, status_filters, type_filters) {
-            println!("{}", item.format_for_list(pos + 1));
-        }
+    for (pos, item) in &filtered {
+        println!("{}", item.format_for_list(*pos));
     }
     Ok(())
 }
@@ -441,15 +441,16 @@ async fn handle_add_command(
 
             if (response == "y" || response == "yes")
                 && let Ok(inbox_items) = client.list_items(folio_core::View::Inbox)
-                    && !inbox_items.is_empty() {
-                        println!();
-                        println!("{}", folio_core::Item::format_list_header());
-                        println!("{}", folio_core::Item::format_list_separator());
+                && !inbox_items.is_empty()
+            {
+                println!();
+                println!("{}", folio_core::Item::format_list_header());
+                println!("{}", folio_core::Item::format_list_separator());
 
-                        for (index, item) in inbox_items.iter().enumerate() {
-                            println!("{}", item.format_for_list(index + 1));
-                        }
-                    }
+                for (index, item) in inbox_items.iter().enumerate() {
+                    println!("{}", item.format_for_list(index + 1));
+                }
+            }
 
             std::process::exit(1);
         }

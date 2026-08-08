@@ -662,7 +662,8 @@ impl App {
                      • Delete an existing item (use 'x' key to delete)\n\
                      • Archive an item (change status to 'done' or use 'd' key)\n\
                      • Adjust inbox size: `folio config set max_items N`\n\
-                     • Change overflow strategy: `folio config set archive_on_overflow [todo|any]`".to_string();
+                     • Change overflow strategy: `folio config set archive_on_overflow [todo|any]`"
+                    .to_string();
                 self.show_cap_warning = true;
                 None
             }
