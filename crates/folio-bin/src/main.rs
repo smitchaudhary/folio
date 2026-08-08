@@ -48,29 +48,29 @@ async fn run() -> Result<(), CliError> {
                 } else {
                     View::Inbox
                 };
-                handle_list_command(&client, view, status.as_deref(), r#type.as_deref()).await?;
+                handle_list_command(&client, view, status.as_deref(), r#type.as_deref())?;
             }
             Commands::SetStatus {
                 id,
                 status,
                 archive,
             } => {
-                handle_set_status_command(&client, *id, status, *archive).await?;
+                handle_set_status_command(&client, *id, status, *archive)?;
             }
             Commands::Edit { id, archive } => {
-                handle_edit_command(&client, *id, *archive).await?;
+                handle_edit_command(&client, *id, *archive)?;
             }
             Commands::Archive { id } => {
-                handle_archive_command(&client, *id).await?;
+                handle_archive_command(&client, *id)?;
             }
             Commands::Delete { id, archive } => {
-                handle_delete_command(&client, *id, *archive).await?;
+                handle_delete_command(&client, *id, *archive)?;
             }
             Commands::MarkRef { id, archive } => {
-                handle_mark_ref_command(&client, *id, *archive).await?;
+                handle_mark_ref_command(&client, *id, *archive)?;
             }
             Commands::Config { subcommand } => {
-                handle_config_command(&client, subcommand).await?;
+                handle_config_command(&client, subcommand)?;
             }
         },
         None => {
@@ -90,7 +90,7 @@ fn resolve_item_index(id: usize, len: usize) -> Result<usize, CliError> {
     }
 }
 
-async fn handle_list_command(
+fn handle_list_command(
     client: &folio_client::Client,
     view: View,
     status_filters: Option<&[String]>,
@@ -159,7 +159,7 @@ fn matches_filters(
     true
 }
 
-async fn handle_set_status_command(
+fn handle_set_status_command(
     client: &folio_client::Client,
     id: usize,
     status_str: &str,
@@ -209,7 +209,7 @@ async fn handle_set_status_command(
     Ok(())
 }
 
-async fn handle_edit_command(
+fn handle_edit_command(
     client: &folio_client::Client,
     id: usize,
     archive: bool,
@@ -229,19 +229,19 @@ async fn handle_edit_command(
 
     println!("Editing item #{}. Leave blank to keep current value.", id);
     println!("Current name: {}", original_name);
-    let name_input = prompt_for_input("Name").await?;
+    let name_input = prompt_for_input("Name")?;
 
     println!("Current type: {}", original_type);
-    let type_input = prompt_for_input("Type").await?;
+    let type_input = prompt_for_input("Type")?;
 
     println!("Current author: {}", original_author);
-    let author_input = prompt_for_input("Author").await?;
+    let author_input = prompt_for_input("Author")?;
 
     println!("Current link: {}", original_link);
-    let link_input = prompt_for_input("Link").await?;
+    let link_input = prompt_for_input("Link")?;
 
     println!("Current note: {}", original_note);
-    let note_input = prompt_for_input("Note").await?;
+    let note_input = prompt_for_input("Note")?;
 
     let mut request = folio_client::EditItemRequest::default();
     if !name_input.is_empty() {
@@ -271,7 +271,7 @@ async fn handle_edit_command(
     Ok(())
 }
 
-async fn handle_archive_command(client: &folio_client::Client, id: usize) -> Result<(), CliError> {
+fn handle_archive_command(client: &folio_client::Client, id: usize) -> Result<(), CliError> {
     let inbox_items = client
         .list_items(View::Inbox)
         .map_err(|e| map_client_error(id, e))?;
@@ -298,7 +298,7 @@ async fn handle_archive_command(client: &folio_client::Client, id: usize) -> Res
     }
 }
 
-async fn handle_delete_command(
+fn handle_delete_command(
     client: &folio_client::Client,
     id: usize,
     archive: bool,
@@ -338,7 +338,7 @@ async fn handle_delete_command(
     Ok(())
 }
 
-async fn handle_mark_ref_command(
+fn handle_mark_ref_command(
     client: &folio_client::Client,
     id: usize,
     archive: bool,
@@ -371,7 +371,7 @@ async fn handle_mark_ref_command(
     Ok(())
 }
 
-async fn prompt_for_input(field_name: &str) -> Result<String, CliError> {
+fn prompt_for_input(field_name: &str) -> Result<String, CliError> {
     use std::io::{Write, stdin, stdout};
 
     print!("{}: ", field_name);
@@ -458,7 +458,7 @@ async fn handle_add_command(
     }
 }
 
-async fn handle_config_command(
+fn handle_config_command(
     client: &folio_client::Client,
     subcommand: &ConfigSubcommands,
 ) -> Result<(), CliError> {
