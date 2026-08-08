@@ -165,7 +165,7 @@ pub fn save_config(
     }
 
     let tx = conn.transaction().map_err(|e| DbError::Other(e.into()))?;
-    let inbox_count: i64 = tx
+    let inbox_count: u32 = tx
         .query_row(
             "SELECT COUNT(*) FROM items WHERE status != 'done'",
             [],
@@ -173,8 +173,8 @@ pub fn save_config(
         )
         .map_err(|e| DbError::Other(e.into()))?;
 
-    if (max_items as i64) < inbox_count {
-        return Err(DbError::InboxOverCap(inbox_count as u32));
+    if max_items < inbox_count {
+        return Err(DbError::InboxOverCap(inbox_count));
     }
 
     tx.execute(
