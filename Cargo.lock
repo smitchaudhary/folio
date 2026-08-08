@@ -670,17 +670,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "folio-storage"
-version = "0.1.0"
-dependencies = [
- "dirs",
- "folio-core",
- "serde",
- "serde_json",
- "thiserror",
-]
-
-[[package]]
 name = "folio-tui"
 version = "0.1.0"
 dependencies = [
