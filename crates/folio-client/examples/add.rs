@@ -16,7 +16,12 @@ fn main() {
     let client = Client::new(&base_url);
     match client.add_item(request) {
         Ok((item, overflow)) => {
-            println!("added: {} | {} | {}", item.id, item.name, item.status.as_string());
+            println!(
+                "added: {} | {} | {}",
+                item.id,
+                item.name,
+                item.status.as_string()
+            );
             for o in &overflow {
                 println!("overflow archived: {} | {}", o.id, o.name);
             }

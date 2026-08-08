@@ -48,10 +48,18 @@ struct Cli {
 #[derive(Subcommand)]
 enum Commands {
     Serve {
-        #[arg(long, default_value = "127.0.0.1:8787", help = "Address to bind the server to")]
+        #[arg(
+            long,
+            default_value = "127.0.0.1:8787",
+            help = "Address to bind the server to"
+        )]
         bind: SocketAddr,
 
-        #[arg(long, default_value = "~/.folio/folio.db", help = "Path to the database file")]
+        #[arg(
+            long,
+            default_value = "~/.folio/folio.db",
+            help = "Path to the database file"
+        )]
         db: PathBuf,
     },
 }
@@ -140,7 +148,7 @@ async fn add_item(
                 StatusCode::BAD_REQUEST,
                 "validation_error",
                 &e.to_string(),
-            ))
+            ));
         }
     };
 
@@ -255,7 +263,7 @@ async fn move_item(
                 StatusCode::BAD_REQUEST,
                 "invalid_direction",
                 "Valid options are: up, down",
-            ))
+            ));
         }
     };
 
@@ -307,7 +315,7 @@ async fn update_config(
                 StatusCode::BAD_REQUEST,
                 "invalid_overflow_strategy",
                 "Valid options are: abort, todo, any",
-            ))
+            ));
         }
     };
 
@@ -344,7 +352,7 @@ async fn update_item_status(
                     "Invalid status '{}'. Valid options are: todo, doing, done",
                     body.status
                 ),
-            ))
+            ));
         }
     };
 

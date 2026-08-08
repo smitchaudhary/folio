@@ -173,7 +173,10 @@ impl AppState {
     }
 
     pub fn move_item_up(&mut self) -> Result<(), CoreError> {
-        let selected_id = self.selected_item_id.clone().ok_or(CoreError::ItemNotFound)?;
+        let selected_id = self
+            .selected_item_id
+            .clone()
+            .ok_or(CoreError::ItemNotFound)?;
         let items = self.current_items_mut();
 
         let pos = items
@@ -190,7 +193,10 @@ impl AppState {
     }
 
     pub fn move_item_down(&mut self) -> Result<(), CoreError> {
-        let selected_id = self.selected_item_id.clone().ok_or(CoreError::ItemNotFound)?;
+        let selected_id = self
+            .selected_item_id
+            .clone()
+            .ok_or(CoreError::ItemNotFound)?;
         let items = self.current_items_mut();
 
         let pos = items
@@ -210,10 +216,7 @@ impl AppState {
         self.filter = filter;
 
         if let Some(selected_id) = self.selected_item_id.as_ref() {
-            let still_visible = self
-                .visible_items()
-                .iter()
-                .any(|(id, _)| id == selected_id);
+            let still_visible = self.visible_items().iter().any(|(id, _)| id == selected_id);
 
             if !still_visible {
                 self.selected_item_id = self.visible_items().first().map(|(id, _)| id.clone());

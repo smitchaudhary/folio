@@ -1,5 +1,5 @@
-use folio_core::{Item, View};
 use chrono::{DateTime, Utc};
+use folio_core::{Item, View};
 use folio_core::{ItemType, Kind, OverflowStrategy, Status};
 use rusqlite::{Connection, params};
 use std::path::{Path, PathBuf};
@@ -80,10 +80,7 @@ struct ItemRow {
     finished_at: Option<String>,
 }
 
-pub fn load_items(
-    conn: &Connection,
-    view: View,
-) -> Result<Vec<Item>, Box<dyn std::error::Error>> {
+pub fn load_items(conn: &Connection, view: View) -> Result<Vec<Item>, Box<dyn std::error::Error>> {
     let where_clause = match view {
         View::Inbox => " WHERE status != 'done'",
         View::Archive => " WHERE status = 'done'",
@@ -170,7 +167,6 @@ pub fn load_config(conn: &Connection) -> Result<folio_core::Config, Box<dyn std:
     Ok(folio_core::Config {
         max_items,
         archive_on_overflow,
-
     })
 }
 
@@ -209,7 +205,6 @@ pub fn save_config(
     Ok(folio_core::Config {
         max_items,
         archive_on_overflow,
-
     })
 }
 

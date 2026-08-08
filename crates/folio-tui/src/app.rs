@@ -118,7 +118,9 @@ impl App {
                 }
             }
             Err(folio_client::ClientError::InboxFull) => {
-                self.show_status_message("Cannot move to inbox: capacity limit reached".to_string());
+                self.show_status_message(
+                    "Cannot move to inbox: capacity limit reached".to_string(),
+                );
             }
             Err(_) => {
                 self.show_status_message("Failed to update status".to_string());
@@ -392,7 +394,8 @@ impl App {
                     View::Inbox => self.state.current_view = View::Archive,
                     View::Archive => self.state.current_view = View::Inbox,
                 }
-                self.state.selected_item_id = self.state.visible_items().first().map(|(id, _)| id.clone());
+                self.state.selected_item_id =
+                    self.state.visible_items().first().map(|(id, _)| id.clone());
                 self.table_state.select(self.state.selected_table_row());
                 self.show_status_message(
                     match self.state.current_view {
@@ -551,7 +554,9 @@ impl App {
                             config.archive_on_overflow = strategy;
                             match self.client.set_config(&config) {
                                 Ok(_) => {
-                                    self.show_status_message("Config saved successfully".to_string());
+                                    self.show_status_message(
+                                        "Config saved successfully".to_string(),
+                                    );
                                     self.show_config_dialog = false;
                                 }
                                 Err(e) => {

@@ -16,7 +16,12 @@ fn main() {
         Ok(items) => {
             println!("{} items in {:?}:", items.len(), view);
             for item in &items {
-                println!("  {} | {} | {}", item.id, item.name, item.status.as_string());
+                println!(
+                    "  {} | {} | {}",
+                    item.id,
+                    item.name,
+                    item.status.as_string()
+                );
             }
         }
         Err(e) => {

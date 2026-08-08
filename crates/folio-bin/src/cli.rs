@@ -40,7 +40,11 @@ pub enum Commands {
         #[arg(long, conflicts_with = "all", help = "Show archived items")]
         archive: bool,
 
-        #[arg(long, conflicts_with = "archive", help = "Show inbox and archive combined")]
+        #[arg(
+            long,
+            conflicts_with = "archive",
+            help = "Show inbox and archive combined"
+        )]
         all: bool,
     },
 
@@ -51,7 +55,10 @@ pub enum Commands {
         #[arg(help = "New status: todo, doing, done")]
         status: String,
 
-        #[arg(long, help = "Target archived items — IDs are positions within the archive")]
+        #[arg(
+            long,
+            help = "Target archived items — IDs are positions within the archive"
+        )]
         archive: bool,
     },
 
@@ -59,7 +66,10 @@ pub enum Commands {
         #[arg(help = "Item ID (position in the current view)")]
         id: usize,
 
-        #[arg(long, help = "Target archived items — IDs are positions within the archive")]
+        #[arg(
+            long,
+            help = "Target archived items — IDs are positions within the archive"
+        )]
         archive: bool,
     },
 
@@ -72,7 +82,10 @@ pub enum Commands {
         #[arg(help = "Item ID (position in the current view)")]
         id: usize,
 
-        #[arg(long, help = "Target archived items — IDs are positions within the archive")]
+        #[arg(
+            long,
+            help = "Target archived items — IDs are positions within the archive"
+        )]
         archive: bool,
     },
 
@@ -80,7 +93,10 @@ pub enum Commands {
         #[arg(help = "Item ID (position in the current view)")]
         id: usize,
 
-        #[arg(long, help = "Target archived items — IDs are positions within the archive")]
+        #[arg(
+            long,
+            help = "Target archived items — IDs are positions within the archive"
+        )]
         archive: bool,
     },
 

@@ -169,12 +169,10 @@ async fn handle_set_status_command(
         status: status_str.to_string(),
     })?;
 
-    let view = if archive {
-        View::Archive
-    } else {
-        View::Inbox
-    };
-    let items = client.list_items(view).map_err(|e| map_client_error(id, e))?;
+    let view = if archive { View::Archive } else { View::Inbox };
+    let items = client
+        .list_items(view)
+        .map_err(|e| map_client_error(id, e))?;
     let index = resolve_item_index(id, items.len())?;
     let stable_id = items[index].id.clone();
 
@@ -216,12 +214,10 @@ async fn handle_edit_command(
     id: usize,
     archive: bool,
 ) -> Result<(), CliError> {
-    let view = if archive {
-        View::Archive
-    } else {
-        View::Inbox
-    };
-    let items = client.list_items(view).map_err(|e| map_client_error(id, e))?;
+    let view = if archive { View::Archive } else { View::Inbox };
+    let items = client
+        .list_items(view)
+        .map_err(|e| map_client_error(id, e))?;
     let index = resolve_item_index(id, items.len())?;
     let item = &items[index];
 
@@ -275,11 +271,10 @@ async fn handle_edit_command(
     Ok(())
 }
 
-async fn handle_archive_command(
-    client: &folio_client::Client,
-    id: usize,
-) -> Result<(), CliError> {
-    let inbox_items = client.list_items(View::Inbox).map_err(|e| map_client_error(id, e))?;
+async fn handle_archive_command(client: &folio_client::Client, id: usize) -> Result<(), CliError> {
+    let inbox_items = client
+        .list_items(View::Inbox)
+        .map_err(|e| map_client_error(id, e))?;
     match resolve_item_index(id, inbox_items.len()) {
         Ok(index) => {
             let stable_id = inbox_items[index].id.clone();
@@ -290,7 +285,9 @@ async fn handle_archive_command(
             Ok(())
         }
         Err(_) => {
-            let archive_items = client.list_items(View::Archive).map_err(|e| map_client_error(id, e))?;
+            let archive_items = client
+                .list_items(View::Archive)
+                .map_err(|e| map_client_error(id, e))?;
             if resolve_item_index(id, archive_items.len()).is_ok() {
                 println!("Item #{} is already in archive", id);
                 Ok(())
@@ -306,12 +303,10 @@ async fn handle_delete_command(
     id: usize,
     archive: bool,
 ) -> Result<(), CliError> {
-    let view = if archive {
-        View::Archive
-    } else {
-        View::Inbox
-    };
-    let items = client.list_items(view).map_err(|e| map_client_error(id, e))?;
+    let view = if archive { View::Archive } else { View::Inbox };
+    let items = client
+        .list_items(view)
+        .map_err(|e| map_client_error(id, e))?;
     let index = resolve_item_index(id, items.len())?;
     let item = &items[index];
 
@@ -349,7 +344,9 @@ async fn handle_mark_ref_command(
     archive: bool,
 ) -> Result<(), CliError> {
     if !archive {
-        let inbox_items = client.list_items(View::Inbox).map_err(|e| map_client_error(id, e))?;
+        let inbox_items = client
+            .list_items(View::Inbox)
+            .map_err(|e| map_client_error(id, e))?;
         if resolve_item_index(id, inbox_items.len()).is_ok() {
             println!(
                 "Cannot mark reference for items in inbox. Only archived (done) items can be marked as references. Use 'folio mark-ref --archive <id>'."
@@ -359,7 +356,9 @@ async fn handle_mark_ref_command(
         return Err(CliError::ItemNotFound { id });
     }
 
-    let archive_items = client.list_items(View::Archive).map_err(|e| map_client_error(id, e))?;
+    let archive_items = client
+        .list_items(View::Archive)
+        .map_err(|e| map_client_error(id, e))?;
     let index = resolve_item_index(id, archive_items.len())?;
     let item = client
         .toggle_kind(&archive_items[index].id)
@@ -397,9 +396,8 @@ async fn handle_add_command(
         return Ok(());
     }
 
-    let mut request = folio_client::AddItemRequest::new(
-        name.clone().unwrap_or_else(|| "Untitled".to_string()),
-    );
+    let mut request =
+        folio_client::AddItemRequest::new(name.clone().unwrap_or_else(|| "Untitled".to_string()));
     request.item_type = item_type.clone();
     request.author = author.clone();
     request.link = link.clone();
@@ -427,9 +425,7 @@ async fn handle_add_command(
             println!();
             println!("Choose an action:");
             println!("  [D]elete an existing item (use 'folio delete <id>')");
-            println!(
-                "  [A]rchive an item (change status to 'done' or use 'folio archive <id>')"
-            );
+            println!("  [A]rchive an item (change status to 'done' or use 'folio archive <id>')");
             println!("  [I]ncrease inbox size: `folio config set max_items N`");
             println!(
                 "  [C]hange overflow strategy: `folio config set archive_on_overflow [todo|any]`"
@@ -494,11 +490,11 @@ async fn handle_config_command(
             let mut config = client.get_config()?;
             match key.as_str() {
                 "max_items" => {
-                    let val = value.parse::<u32>().map_err(|_| {
-                        CliError::InvalidMaxItems {
+                    let val = value
+                        .parse::<u32>()
+                        .map_err(|_| CliError::InvalidMaxItems {
                             value: value.clone(),
-                        }
-                    })?;
+                        })?;
                     config.max_items = val;
                 }
                 "archive_on_overflow" => {
@@ -509,7 +505,7 @@ async fn handle_config_command(
                         _ => {
                             return Err(CliError::InvalidOverflowStrategy {
                                 value: value.to_string(),
-                            })
+                            });
                         }
                     };
                 }
