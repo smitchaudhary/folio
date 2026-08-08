@@ -308,22 +308,21 @@ pub fn update_item_status(
             let item_to_move = archive_items.remove(item_index);
             result.moved_to_inbox = true;
 
-            match add_item_to_inbox(inbox_items.clone(), item_to_move.clone(), config) {
-                Ok((new_inbox, to_archive)) => {
-                    inbox_items = new_inbox;
-                    result.overflow_items = to_archive.clone();
+            if let Ok((new_inbox, to_archive)) =
+                add_item_to_inbox(inbox_items.clone(), item_to_move.clone(), config)
+            {
+                inbox_items = new_inbox;
+                result.overflow_items = to_archive.clone();
 
-                    for overflow_item in to_archive {
-                        archive_items.push(overflow_item);
-                    }
+                for overflow_item in to_archive {
+                    archive_items.push(overflow_item);
                 }
-                Err(_) => {
-                    // Rollback - put item back in archive
-                    archive_items.insert(item_index, item_to_move);
-                    result.inbox_items = inbox_items;
-                    result.archive_items = archive_items;
-                    return Err(CoreError::InboxFull);
-                }
+            } else {
+                // Rollback - put item back in archive
+                archive_items.insert(item_index, item_to_move);
+                result.inbox_items = inbox_items;
+                result.archive_items = archive_items;
+                return Err(CoreError::InboxFull);
             }
         }
     }

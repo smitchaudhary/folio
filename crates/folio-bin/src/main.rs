@@ -270,25 +270,22 @@ fn handle_archive_command(client: &folio_client::Client, id: usize) -> Result<()
     let inbox_items = client
         .list_items(View::Inbox)
         .map_err(|e| map_client_error(id, e))?;
-    match resolve_item_index(id, inbox_items.len()) {
-        Ok(index) => {
-            let stable_id = inbox_items[index].id.clone();
-            client
-                .change_status(&stable_id, Status::Done)
-                .map_err(|e| map_client_error(id, e))?;
-            println!("Item #{id} marked as done and archived successfully");
+    if let Ok(index) = resolve_item_index(id, inbox_items.len()) {
+        let stable_id = inbox_items[index].id.clone();
+        client
+            .change_status(&stable_id, Status::Done)
+            .map_err(|e| map_client_error(id, e))?;
+        println!("Item #{id} marked as done and archived successfully");
+        Ok(())
+    } else {
+        let archive_items = client
+            .list_items(View::Archive)
+            .map_err(|e| map_client_error(id, e))?;
+        if resolve_item_index(id, archive_items.len()).is_ok() {
+            println!("Item #{id} is already in archive");
             Ok(())
-        }
-        Err(_) => {
-            let archive_items = client
-                .list_items(View::Archive)
-                .map_err(|e| map_client_error(id, e))?;
-            if resolve_item_index(id, archive_items.len()).is_ok() {
-                println!("Item #{id} is already in archive");
-                Ok(())
-            } else {
-                Err(CliError::ItemNotFound { id })
-            }
+        } else {
+            Err(CliError::ItemNotFound { id })
         }
     }
 }

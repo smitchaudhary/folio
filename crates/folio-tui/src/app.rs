@@ -92,12 +92,9 @@ impl App {
     }
 
     fn change_selected_status(&mut self, new_status: folio_core::Status) {
-        let selected_id = match self.state.selected_item_id.clone() {
-            Some(id) => id,
-            None => {
-                self.show_status_message("No item selected".to_string());
-                return;
-            }
+        let Some(selected_id) = self.state.selected_item_id.clone() else {
+            self.show_status_message("No item selected".to_string());
+            return;
         };
 
         match self.client.change_status(&selected_id, new_status.clone()) {
@@ -374,19 +371,16 @@ impl App {
             }
             KeyCode::Char('C') => {
                 self.show_config_dialog = true;
-                match self.client.get_config() {
-                    Ok(config) => {
-                        self.config_max_items_input = config.max_items.to_string();
-                        self.config_overflow_strategy = match config.archive_on_overflow {
-                            OverflowStrategy::Abort => 0,
-                            OverflowStrategy::Todo => 1,
-                            OverflowStrategy::Any => 2,
-                        };
-                    }
-                    Err(_) => {
-                        self.config_max_items_input = "30".to_string();
-                        self.config_overflow_strategy = 0;
-                    }
+                if let Ok(config) = self.client.get_config() {
+                    self.config_max_items_input = config.max_items.to_string();
+                    self.config_overflow_strategy = match config.archive_on_overflow {
+                        OverflowStrategy::Abort => 0,
+                        OverflowStrategy::Todo => 1,
+                        OverflowStrategy::Any => 2,
+                    };
+                } else {
+                    self.config_max_items_input = "30".to_string();
+                    self.config_overflow_strategy = 0;
                 }
             }
             KeyCode::Tab => {
@@ -412,17 +406,14 @@ impl App {
                 if let Some(item) = self.state.selected_item()
                     && let Some(link_to_use) = Self::normalized_link(&item.link)
                 {
-                    match opener::open(&link_to_use) {
-                        Ok(_) => {
-                            self.show_status_message("Opening link...".to_string());
+                    if opener::open(&link_to_use).is_ok() {
+                        self.show_status_message("Opening link...".to_string());
+                    } else {
+                        // Try without https:// prefix if we added it
+                        if link_to_use != item.link {
+                            let _ = opener::open(&item.link);
                         }
-                        Err(_) => {
-                            // Try without https:// prefix if we added it
-                            if link_to_use != item.link {
-                                let _ = opener::open(&item.link);
-                            }
-                            self.show_status_message("Opening link...".to_string());
-                        }
+                        self.show_status_message("Opening link...".to_string());
                     }
                 }
             }
@@ -522,9 +513,8 @@ impl App {
             return;
         }
 
-        let selected_id = match self.state.selected_item_id.clone() {
-            Some(id) => id,
-            None => return,
+        let Some(selected_id) = self.state.selected_item_id.clone() else {
+            return;
         };
 
         match self.client.toggle_kind(&selected_id) {
@@ -588,9 +578,8 @@ impl App {
     }
 
     fn delete_selected_item(&mut self) {
-        let selected_id = match self.state.selected_item_id.clone() {
-            Some(id) => id,
-            None => return,
+        let Some(selected_id) = self.state.selected_item_id.clone() else {
+            return;
         };
 
         match self.client.delete_item(&selected_id) {
@@ -705,9 +694,8 @@ impl App {
             .cloned()
             .unwrap_or_default();
 
-        let selected_id = match self.state.selected_item_id.clone() {
-            Some(id) => id,
-            None => return false,
+        let Some(selected_id) = self.state.selected_item_id.clone() else {
+            return false;
         };
 
         let request = folio_client::EditItemRequest {
@@ -718,16 +706,13 @@ impl App {
             note: Some(note),
         };
 
-        match self.client.edit_item(&selected_id, request) {
-            Ok(_) => {
-                let _ = self.refresh_data();
-                self.show_status_message("Item updated".to_string());
-                true
-            }
-            Err(_) => {
-                self.show_status_message("Failed to update item".to_string());
-                false
-            }
+        if self.client.edit_item(&selected_id, request).is_ok() {
+            let _ = self.refresh_data();
+            self.show_status_message("Item updated".to_string());
+            true
+        } else {
+            self.show_status_message("Failed to update item".to_string());
+            false
         }
     }
 

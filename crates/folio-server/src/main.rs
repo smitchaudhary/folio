@@ -308,15 +308,12 @@ async fn update_config(
     State(state): State<AppState>,
     Json(body): Json<UpdateConfigRequest>,
 ) -> Result<(StatusCode, Json<serde_json::Value>), (StatusCode, Json<serde_json::Value>)> {
-    let strategy = match OverflowStrategy::from_str(&body.archive_on_overflow) {
-        Ok(s) => s,
-        Err(_) => {
-            return Err(error_response(
-                StatusCode::BAD_REQUEST,
-                "invalid_overflow_strategy",
-                "Valid options are: abort, todo, any",
-            ));
-        }
+    let Ok(strategy) = OverflowStrategy::from_str(&body.archive_on_overflow) else {
+        return Err(error_response(
+            StatusCode::BAD_REQUEST,
+            "invalid_overflow_strategy",
+            "Valid options are: abort, todo, any",
+        ));
     };
 
     let mut conn = state.conn.lock().unwrap();
@@ -342,18 +339,15 @@ async fn update_item_status(
     UrlPath(id): UrlPath<String>,
     Json(body): Json<UpdateStatusRequest>,
 ) -> Result<(StatusCode, Json<serde_json::Value>), (StatusCode, Json<serde_json::Value>)> {
-    let new_status = match Status::from_str(&body.status) {
-        Ok(s) => s,
-        Err(_) => {
-            return Err(error_response(
-                StatusCode::BAD_REQUEST,
-                "invalid_status",
-                &format!(
-                    "Invalid status '{}'. Valid options are: todo, doing, done",
-                    body.status
-                ),
-            ));
-        }
+    let Ok(new_status) = Status::from_str(&body.status) else {
+        return Err(error_response(
+            StatusCode::BAD_REQUEST,
+            "invalid_status",
+            &format!(
+                "Invalid status '{}'. Valid options are: todo, doing, done",
+                body.status
+            ),
+        ));
     };
 
     let mut conn = state.conn.lock().unwrap();
