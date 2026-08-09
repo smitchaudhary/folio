@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>folio</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><circle cx='50' cy='50' r='42' fill='%231F7A4D'/><text x='50' y='66' font-size='52' text-anchor='middle' fill='white' font-family='Georgia,serif'>f</text></svg>">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<header class="top">
+  <div class="logo">folio<span>.</span></div>
+  <nav class="tabs" id="tabs">
+    <button class="tab on" data-view="inbox">Inbox</button>
+    <button class="tab" data-view="archive">Archive</button>
+    <button class="tab" data-view="all">All</button>
+  </nav>
+  <div class="search"><span class="k">/</span><input id="search" placeholder="search name, author, link…" autocomplete="off"></div>
+  <button class="btn" id="btn-config" title="config">⚙</button>
+  <button class="btn" id="btn-dark" title="toggle dark mode">🌓</button>
+  <button class="btn primary" id="btn-add">+ Add</button>
+</header>
+
+<div id="banner" class="banner" hidden></div>
+
+<section class="cap">
+  <span class="count" id="count"></span>
+  <div class="progress"><i id="bar"></i></div>
+  <span class="overflow" id="overflow" hidden></span>
+</section>
+
+<main id="list" class="list" aria-live="polite"></main>
+
+<footer class="hints">
+  <span>/ search &middot; n add &middot; click a status emoji to choose its state</span>
+  <span id="footcount"></span>
+</footer>
+
+<div id="modal" class="modal" hidden>
+  <form class="box" id="form" novalidate>
+    <h4 id="modal-title">Add to inbox</h4>
+    <label>Name</label>
+    <input id="f-name" placeholder="Some title" maxlength="200">
+    <div class="row2">
+      <div>
+        <label>Type</label>
+        <select id="f-type">
+          <option value="blog_post">blog_post</option>
+          <option value="video">video</option>
+          <option value="podcast">podcast</option>
+          <option value="news">news</option>
+          <option value="thread">thread</option>
+          <option value="academic_paper">academic_paper</option>
+          <option value="other">other</option>
+        </select>
+      </div>
+      <div><label>Author</label><input id="f-author" maxlength="100"></div>
+    </div>
+    <label>Link</label>
+    <input id="f-link" type="url" placeholder="https://…" maxlength="500">
+    <label>Note</label>
+    <input id="f-note" maxlength="500">
+    <p id="form-error" class="form-error" hidden></p>
+    <div class="mbtns">
+      <button type="button" class="btn" id="btn-cancel">Cancel</button>
+      <button type="submit" class="btn primary" id="btn-save">Add</button>
+    </div>
+  </form>
+</div>
+
+<div id="config" class="config" hidden>
+  <h5>Config</h5>
+  <label>max_items <input type="number" id="cfg-max" min="1" max="200"></label>
+  <label>on overflow
+    <select id="cfg-strategy">
+      <option value="abort">abort &mdash; block new items</option>
+      <option value="todo">archive oldest todo</option>
+      <option value="any">archive oldest item</option>
+    </select>
+  </label>
+  <button class="btn primary" id="btn-config-save">Save</button>
+  <p class="cfg-note">The web app is served from the same server. Tailscale is the only door.</p>
+</div>
+
+<script src="app.js"></script>
+</body>
+</html>
