@@ -22,6 +22,7 @@ tokio-stream = "0.1"
 opener = "0.8"
 dirs = "6.0"
 axum = "0.8"
+tower-http = { version = "0.6", features = ["fs"] }
 rusqlite = { version = "0.37", features = ["bundled"] }
 uuid = { version = "1.0", features = ["v4"] }
 ureq = "3"

@@ -12,6 +12,7 @@ use std::net::SocketAddr;
 use std::path::{Path, PathBuf};
 use std::str::FromStr;
 use std::sync::{Arc, Mutex};
+use tower_http::services::{ServeDir, ServeFile};
 
 #[derive(Clone)]
 struct AppState {
@@ -61,6 +62,13 @@ enum Commands {
             help = "Path to the database file"
         )]
         db: PathBuf,
+
+        #[arg(
+            long,
+            default_value = "web",
+            help = "Directory with the web app files"
+        )]
+        web_dir: PathBuf,
     },
 }
 
@@ -68,11 +76,11 @@ enum Commands {
 async fn main() {
     let cli = Cli::parse();
     match cli.command {
-        Commands::Serve { bind, db } => serve(bind, &db).await,
+        Commands::Serve { bind, db, web_dir } => serve(bind, &db, web_dir).await,
     }
 }
 
-async fn serve(bind: SocketAddr, db_arg: &Path) {
+async fn serve(bind: SocketAddr, db_arg: &Path, web_dir: PathBuf) {
     let (conn, db_path) = match db::open(db_arg) {
         Ok(v) => v,
         Err(e) => {
@@ -100,6 +108,9 @@ async fn serve(bind: SocketAddr, db_arg: &Path) {
         .route("/api/items/{id}/kind", post(toggle_kind))
         .route("/api/items/{id}/move", post(move_item))
         .route("/api/config", get(get_config).put(update_config))
+        .fallback_service(
+            ServeDir::new(&web_dir).fallback(ServeFile::new(web_dir.join("index.html"))),
+        )
         .with_state(state);
 
     let listener = match tokio::net::TcpListener::bind(bind).await {

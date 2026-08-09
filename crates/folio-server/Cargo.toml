@@ -12,6 +12,7 @@ clap = { workspace = true }
 rusqlite = { workspace = true }
 dirs = { workspace = true }
 axum = { workspace = true }
+tower-http = { workspace = true }
 tokio = { workspace = true }
 serde_json = { workspace = true }
 serde = { workspace = true }
