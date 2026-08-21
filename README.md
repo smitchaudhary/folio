@@ -14,6 +14,14 @@ So now, I made a small tool where I can only have a limited number of items in m
 
 Hopefully this will also make me deliberate in what I add in the first place.
 
+## Architecture
+
+Folio is a small client-server tool:
+
+- **`folio-server`** has the data (SQLite) and serves a web UI
+- **`folio`** (CLI) and the built-in TUI are thin clients that talk to it over HTTP
+- **`web/`** is a dependency-free single page app served by the same server
+
 ## Install
 
 Clone it and build it. And it is yours. Do as you see fit.
@@ -22,8 +30,35 @@ Clone it and build it. And it is yours. Do as you see fit.
 git clone https://github.com/smitchaudhary/folio.git
 cd folio
 
+cargo install --path crates/folio-server
 cargo install --path crates/folio-bin
 ```
+
+## Running the Server
+
+Everything needs a running server first:
+
+```bash
+folio-server serve
+```
+
+Options:
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--bind` | `127.0.0.1:8787` | Address to listen on |
+| `--db` | `~/.folio/folio.db` | Path to the SQLite database |
+| `--web-dir` | `web` | Directory containing the web app files |
+
+The web UI is then at `http://127.0.0.1:8787`.
+
+### Pointing Clients at the Server
+
+The CLI and TUI find the server in this order:
+
+1. `FOLIO_SERVER` environment variable (e.g. `FOLIO_SERVER=http://myhost:8787`)
+2. `~/.folio/client.json` containing `{"server_url": "http://..."}`
+3. Fallback: `http://127.0.0.1:8787`
 
 ## How To
 
@@ -38,6 +73,16 @@ folio add --name "My fav video" --type video --author "Some dude"
 
 # Add a podcast
 ... (you get it now)
+
+# Notes work too
+folio add --name "Some paper" --type academic_paper --link "https://..." --note "read section 3"
+
+# References are kept forever: kind=reference items are added straight
+# to the archive as done
+folio add --name "Rust book" --type blog_post --link "https://..." --kind reference
+
+# No --name? Opens an interactive add form in the TUI instead
+folio add
 ```
 
 ### View Your Items
@@ -58,9 +103,19 @@ You can also use the TUI
 
 ```bash
 folio
-
-folio add
 ```
+
+### Web App
+
+The server also serves a small web UI. No build step, no framework, just open the server URL in a browser.
+
+- Inbox / Archive / All tabs (also hash routes: `#/inbox`, `#/archive`, `#/all`)
+- `/` focuses search, `n` opens the add form
+- Click the status emoji on any row to change its state
+- Edit, delete, toggle reference, and edit config inline
+- Dark mode toggle (remembered in localStorage)
+
+No auth. Is only accessible from the tailnet for me, do as you wish ofc.
 
 ## Item Types
 
@@ -102,13 +157,15 @@ folio delete 1                     # Delete item #1
 folio delete --archive 1           # Delete archived item #1
 folio archive 1                    # Move to archive
 
-# Manage references
+# Manage references (archived items only)
 folio mark-ref --archive 1         # Mark/unmark archived item #1 as reference
 
 # Config
 folio config list             # Show current config
+folio config get max_items    # Show one value
 folio config set max_items 50 # Set inbox limit
 folio config set archive_on_overflow todo  # Auto-archive oldest todo items
+folio config reset            # Back to defaults
 ```
 
 > **IDs** are positions within the current view (inbox by default, archive with `--archive`). Filtered lists show true positions with gaps, so any ID you see in a list works directly in a command.
@@ -120,7 +177,7 @@ Each item has one of three statuses:
 - **⏳ Doing**: Currently working on
 - **✅ Done**: Completed (automatically archived)
 
-### Interactive Terminal UI
+### Terminal UI
 
 Launch the TUI for a more visual experience:
 ```bash
@@ -129,12 +186,15 @@ folio
 
 **TUI Controls:**
 - `↑/↓` or `j/k`: Navigate items
+- `J/K`: Move selected item down/up within its list
+- `PgUp/PgDn`: Jump pages, `Home/End`: Jump to top/bottom
 - `Enter`: Open link
+- `y`: Copy link to clipboard
 - `a`: Add new item
 - `e`: Edit selected item
-- `t/i/d`: Change status (todo/in progress/done)
-- `x`: Delete item
-- `r`: Toggle reference status
+- `t/i/d`: Change status (todo/in progress/done where done asks for confirmation)
+- `x`: Delete item (asks for confirmation)
+- `r`: Toggle reference status (archive view only)
 - `Tab`: Switch between Inbox/Archive
 - `/`: Filter items
 - `C`: Configuration
@@ -143,17 +203,9 @@ folio
 
 ## Config
 
-Folio stores config in `~/.folio/config.json`:
+Config lives inside the database (`config` table in `~/.folio/folio.db`) and can be read/written through the `folio config` subcommands shown above.
 
-```json
-{
-  "max_items": 30,
-  "archive_on_overflow": "abort",
-  "_v": 1
-}
-```
-
-The version thing is in case I want to later change something and then migrate stuff.
+Defaults: `max_items = 30`, overflow strategy `abort`.
 
 ### Overflow Strategies
 
@@ -161,21 +213,21 @@ The version thing is in case I want to later change something and then migrate s
 - **`todo`**: Auto-archive oldest todo items (the lose it of the "read it or lose it thing")
 - **`any`**: Auto-archive the oldest item, regardless of status
 
+Notes:
+- `max_items` must be between 1 and 1000 and cannot be set below the current inbox size.
+- When the inbox is full and the strategy is `abort`, adding fails with a friendly message listing your options. With `todo`/`any`, the oldest item is archived automatically.
+
 ## Data Storage
 
-Folio stores your data locally in `~/.folio/`:
+All state lives in a single SQLite file managed by the server:
 
 ```
 ~/.folio/
-├── inbox.jsonl      # Active items
-├── archive.jsonl    # Completed items
-└── config.json      # User preferences
+├── folio.db       # SQLite database: items + config tables
+└── client.json    # Optional: tells the CLI/TUI where the server is
 ```
 
-**Data Format:**
-```json
-{"name":"Rust Guide","type":"blog_post","status":"todo","author":"Rust Team","link":"https://...","added_at":"2024-01-01T00:00:00Z","version":1}
-```
+Items are stored with stable UUIDs; inbox vs archive is derived from status (`done` = archived), and each list keeps its own ordering.
 
 ## Philosophy & Design
 
